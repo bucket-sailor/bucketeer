@@ -1,0 +1,79 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Copyright 2024 Damian Peckett <damian@pecke.tt>.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+ 
+.navbar {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    width: 100%;
+    height: 46px;
+    padding: 8px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #ccc;
+    background-color: #f0f0f0;
+}
+
+.navbox {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    flex-grow: 1;
+    padding: 4px 16px;
+    margin: 0 8px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    background-color: #d8d8d8;
+    user-select: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.entry {
+    cursor: pointer;
+    box-sizing: border-box;
+    border-radius: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.entry:hover {
+    background-color: #c2c2c2;
+}
+
+.separator {
+    font-weight: 300 !important;
+}
+
+.logoContainer {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    box-sizing: border-box;
+    border-radius: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.logoContainer:hover {
+    background-color: #c2c2c2;
+}

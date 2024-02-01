@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Copyright 2024 Damian Peckett <damian@pecke.tt>.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+ 
+.sidebar {
+    width: 260px !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebarPaper {
+    width: 260px !important;
+    background-color: #fafafa !important;
+}
+
+.logo {
+    height: 1.5em;
+}
+
+/* Sidebar open/close chevrons */
+.openButton {
+    position: fixed !important;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 1000;
+}
+
+.closeButton {
+    position: fixed !important;
+    top: 50%;
+    left: 216px;
+    transform: translateY(-50%);
+    z-index: 1000;
+}
