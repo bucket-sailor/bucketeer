@@ -21,3 +21,15 @@
   height: calc(100vh - 46px);
   width: 100%;
 }
+
+.fileGrid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.errorAlert {
+  margin: 10px;
+}

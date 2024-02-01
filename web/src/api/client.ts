@@ -15,8 +15,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-import pRetry, { AbortError } from 'p-retry'
 import isNetworkError from 'is-network-error'
 
 export interface FileInfo {
@@ -36,13 +34,11 @@ export interface ListResponse {
 }
 
 export interface ClientOptions {
-  maxRetryAttempts?: number
   requestTimeout?: number
 }
 
-interface FetchWithRetryOptions extends RequestInit {
+interface FetchOptions extends RequestInit {
   abortController?: AbortController
-  maxRetryAttempts?: number
   requestTimeout?: number
 }
 
@@ -56,7 +52,7 @@ class Client {
   }
 
   async info (path: string): Promise<FileInfo> {
-    const response = await this.fetchWithRetry(`${this.baseUrl}/api/v1alpha1/fs/info?path=${encodeURIComponent(path)}`)
+    const response = await this.fetch(`${this.baseUrl}/api/v1alpha1/fs/info?path=${encodeURIComponent(path)}`)
     return await this.handleResponse<FileInfo>(response)
   }
 
@@ -66,13 +62,13 @@ class Client {
       url = url.concat(`&id=${id}`)
     }
 
-    const response = await this.fetchWithRetry(url, { abortController })
+    const response = await this.fetch(url, { abortController })
     return await this.handleResponse<ListResponse>(response)
   }
 
   async mkdir (path: string): Promise<void> {
     const body = new URLSearchParams({ path })
-    const response = await this.fetchWithRetry(`${this.baseUrl}/api/v1alpha1/fs/mkdir`, {
+    const response = await this.fetch(`${this.baseUrl}/api/v1alpha1/fs/mkdir`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
@@ -82,7 +78,7 @@ class Client {
 
   async remove (path: string): Promise<void> {
     const body = new URLSearchParams({ path })
-    const response = await this.fetchWithRetry(`${this.baseUrl}/api/v1alpha1/fs/remove`, {
+    const response = await this.fetch(`${this.baseUrl}/api/v1alpha1/fs/remove`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
@@ -92,7 +88,7 @@ class Client {
 
   async rename (oldPath: string, newPath: string): Promise<void> {
     const body = new URLSearchParams({ oldPath, newPath })
-    const response = await this.fetchWithRetry(`${this.baseUrl}/api/v1alpha1/fs/rename`, {
+    const response = await this.fetch(`${this.baseUrl}/api/v1alpha1/fs/rename`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
@@ -100,50 +96,38 @@ class Client {
     await this.handleResponse(response)
   }
 
-  private async fetchWithRetry (url: string, opts?: FetchWithRetryOptions): Promise<Response> {
-    const { maxRetryAttempts = this.opts.maxRetryAttempts, requestTimeout = this.opts.requestTimeout, ...fetchOptions } = opts ?? {}
+  private async fetch (url: string, opts?: FetchOptions): Promise<Response> {
+    const { requestTimeout = this.opts.requestTimeout, ...fetchOptions } = opts ?? {}
+    const abortController = opts?.abortController ?? new AbortController()
 
-    const doRequest = async (): Promise<Response> => {
-      const abortController = opts?.abortController ?? new AbortController()
-
-      let id: ReturnType<typeof setTimeout> | undefined
-      if (requestTimeout !== undefined) {
-        id = setTimeout(() => { abortController.abort() }, requestTimeout)
-      }
-
-      try {
-        const response = await fetch(url, { ...fetchOptions, signal: abortController.signal })
-        if (!response.ok) {
-          await this.handleResponse(response)
-        }
-        return response
-      } catch (error) {
-        if (isNetworkError(error)) {
-          throw new Error('Network error: Unable to connect to the server')
-        } else {
-          throw error
-        }
-      } finally {
-        if (id !== undefined) {
-          clearTimeout(id)
-        }
-      }
+    let id: ReturnType<typeof setTimeout> | undefined
+    if (requestTimeout !== undefined) {
+      id = setTimeout(() => { abortController.abort() }, requestTimeout)
     }
 
-    if (maxRetryAttempts !== undefined) {
-      return await pRetry(doRequest, { retries: maxRetryAttempts })
+    try {
+      const response = await fetch(url, { ...fetchOptions, signal: abortController.signal })
+      if (!response.ok) {
+        await this.handleResponse(response)
+      }
+      return response
+    } catch (error) {
+      if (isNetworkError(error)) {
+        throw new Error('Network error: Unable to connect to the server')
+      } else {
+        throw error
+      }
+    } finally {
+      if (id !== undefined) {
+        clearTimeout(id)
+      }
     }
-
-    return await doRequest()
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       const errorBody: ErrorResponse = await response.json().catch(() => ({ message: 'Failed to parse error response' }))
       const error = new Error(errorBody.message)
-      if (response.status >= 400 && response.status < 500) {
-        throw new AbortError(error.message)
-      }
       throw error
     }
     return await response.json().catch(() => {})

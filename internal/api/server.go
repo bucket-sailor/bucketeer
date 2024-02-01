@@ -27,9 +27,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bucket-sailor/bucketeer/internal/api/v1alpha1"
 	"github.com/bucket-sailor/writablefs"
-	"github.com/dpeckett/bucketeer/internal/api/v1alpha1"
-	"github.com/dpeckett/bucketeer/internal/utils/pathcleaner"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/labstack/echo/v4"
 	"k8s.io/utils/ptr"
@@ -65,11 +64,7 @@ func (s *Server) Register(e *echo.Echo) {
 }
 
 func (s *Server) Info(c echo.Context) error {
-	path := pathcleaner.Clean(c.QueryParam("path"))
-
-	s.logger.Info("Info", "path", path)
-
-	fi, err := s.fsys.Stat(path)
+	fi, err := s.fsys.Stat(c.QueryParam("path"))
 	if err != nil {
 		if errors.Is(err, writablefs.ErrNotExist) {
 			return echo.NewHTTPError(http.StatusNotFound, v1alpha1.ErrorResponse{Message: err.Error()})
@@ -87,24 +82,27 @@ func (s *Server) Info(c echo.Context) error {
 }
 
 func (s *Server) List(c echo.Context) error {
-	path := pathcleaner.Clean(c.QueryParam("path"))
+	var err error
+	var startIndex, stopIndex int64
 
 	startIndexParam := c.QueryParam("startIndex")
-	startIndex, err := strconv.ParseInt(startIndexParam, 10, 64)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: err.Error()})
+	if startIndexParam != "" {
+		startIndex, err = strconv.ParseInt(startIndexParam, 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: err.Error()})
+		}
 	}
 
 	stopIndexParam := c.QueryParam("stopIndex")
-	stopIndex, err := strconv.ParseInt(stopIndexParam, 10, 64)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: err.Error()})
+	if stopIndexParam != "" {
+		stopIndex, err = strconv.ParseInt(stopIndexParam, 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: err.Error()})
+		}
 	}
 
-	s.logger.Info("List", "path", path, "startIndex", startIndex, "stopIndex", stopIndex)
-
 	populateCache := func(id string) ([]v1alpha1.FileInfo, error) {
-		entries, err := s.fsys.ReadDir(path)
+		entries, err := s.fsys.ReadDir(c.QueryParam("path"))
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 		}
@@ -145,8 +143,15 @@ func (s *Server) List(c echo.Context) error {
 		}
 	}
 
+	if startIndex == 0 && stopIndex == 0 {
+		return c.JSON(http.StatusOK, &v1alpha1.ListResponse{
+			ID:    id,
+			Files: files,
+		})
+	}
+
 	if startIndex >= stopIndex {
-		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: "start must be less than stop"})
+		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: "start index must be less than stop index"})
 	}
 
 	startIndex = min(max(startIndex, 0), int64(len(files)))
@@ -159,12 +164,7 @@ func (s *Server) List(c echo.Context) error {
 }
 
 func (s *Server) Mkdir(c echo.Context) error {
-	s.logger.Info("Mkdir", "path", c.FormValue("path"))
-	path := pathcleaner.Clean(c.FormValue("path"))
-
-	s.logger.Info("Mkdir", "path", path)
-
-	if err := s.fsys.MkdirAll(path); err != nil {
+	if err := s.fsys.MkdirAll(c.FormValue("path")); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 	}
 
@@ -172,11 +172,7 @@ func (s *Server) Mkdir(c echo.Context) error {
 }
 
 func (s *Server) Remove(c echo.Context) error {
-	path := pathcleaner.Clean(c.FormValue("path"))
-
-	s.logger.Info("Remove", "path", path)
-
-	if err := s.fsys.RemoveAll(path); err != nil {
+	if err := s.fsys.RemoveAll(c.FormValue("path")); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 	}
 
@@ -184,12 +180,7 @@ func (s *Server) Remove(c echo.Context) error {
 }
 
 func (s *Server) Rename(c echo.Context) error {
-	oldPath := pathcleaner.Clean(c.FormValue("oldPath"))
-	newPath := pathcleaner.Clean(c.FormValue("newPath"))
-
-	s.logger.Info("Rename", "oldPath", oldPath, "newPath", newPath)
-
-	if err := s.fsys.Rename(oldPath, newPath); err != nil {
+	if err := s.fsys.Rename(c.FormValue("oldPath"), c.FormValue("newPath")); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 	}
 

@@ -60,7 +60,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ open, onClose }) => {
                     <b>GitHub:</b> <Link href="https://github.com/bucket-sailor/bucketeer" target="_blank">bucket-sailor/bucketeer</Link>
                 </Typography>
                 <Typography variant="body1">
-                    <b>License:</b> <Link href="http://github.com/dpeckett/bucketeer/blob/main/LICENSE" target="_blank">AGPL-3.0-or-later</Link>
+                    <b>License:</b> <Link href="http://github.com/bucket-sailor/bucketeer/blob/main/LICENSE" target="_blank">AGPL-3.0-or-later</Link>
                 </Typography>
             </DialogContent>
         </Dialog>

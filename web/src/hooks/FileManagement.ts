@@ -16,15 +16,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import type React from 'react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import PQueue from 'p-queue'
 import ApiClient, { type FileInfo } from '../api/client'
 import FilesClient from '../files/client'
+import type InfiniteLoader from 'react-window-infinite-loader'
+
+export interface UseFileManagementProps {
+  baseURL: string
+  fileGridLoaderRef: React.MutableRefObject<InfiniteLoader | null>
+}
+
+export interface FileInfoWithIndex extends FileInfo {
+  index: number
+}
 
 export interface UseFileManagement {
-  directoryContents: FileInfo[]
+  directoryContents: FileInfoWithIndex[]
   error: Error | undefined
-  resetFilesState: () => void
+  refreshFiles: () => void
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
   uploadFile: (path: string) => Promise<void>
   downloadFile: (path: string) => Promise<void>
@@ -33,19 +44,19 @@ export interface UseFileManagement {
   makeDirectory: (path: string) => Promise<void>
 }
 
-export const useFileManagement = (baseURL: string): UseFileManagement => {
-  const [directoryContents, setDirectoryContents] = useState<FileInfo[]>([])
+export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagementProps): UseFileManagement => {
+  const [directoryContents, setDirectoryContents] = useState<FileInfoWithIndex[]>([])
   const [error, setError] = useState<Error | undefined>(undefined)
 
-  // TODO: we shouldn't need to limit concurrency anymore.
+  // TODO: we shouldn't need to limit concurrency anymore (we'll keep it in the short term as it simplifies abort handling).
   const loadFilesQueueRef = useRef<PQueue>(new PQueue({ concurrency: 1 }))
   const loadFilesListIDRef = useRef<string | undefined>(undefined)
   const abortControllerRef = useRef<AbortController | undefined>(undefined)
 
-  const apiClient = new ApiClient(baseURL, { maxRetryAttempts: 3 })
+  const apiClient = new ApiClient(baseURL)
   const filesClient = new FilesClient(`${baseURL}/files`)
 
-  const resetFilesState = useCallback(() => {
+  const refreshFiles = useCallback(() => {
     // Remove any queued up requests, and create a new queue.
     loadFilesQueueRef.current.clear()
     loadFilesQueueRef.current = new PQueue({ concurrency: 1 })
@@ -56,15 +67,22 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
     }
     abortControllerRef.current = undefined
 
-    // Reset the directory contents.
+    // Reset the list ID.
     loadFilesListIDRef.current = undefined
+
+    // Reset the error.
+    setError(undefined)
+
+    // Reset the directory contents.
     setDirectoryContents([])
-  }, [])
+
+    if (fileGridLoaderRef.current !== null) {
+      fileGridLoaderRef.current.resetloadMoreItemsCache(true)
+    }
+  }, [fileGridLoaderRef])
 
   const loadFiles = useCallback(async (path: string, startIndex: number, stopIndex: number): Promise<boolean> => {
     const loadFilesPage = async (): Promise<boolean> => {
-      setError(undefined)
-
       try {
         abortControllerRef.current = new AbortController()
 
@@ -78,15 +96,10 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
 
         const filesCount = response.files?.length ?? 0
         if (filesCount !== 0) {
-          // TODO: shouldn't need to do this anymore (we can use the index).
-          setDirectoryContents(prev => {
-            const newFiles = response?.files?.filter(newItem =>
-              !prev.some(existingItem => existingItem.name === newItem.name)
-            )
-            if (newFiles !== undefined) {
-              return [...prev, ...newFiles]
-            }
-            return prev
+          setDirectoryContents((prev) => {
+            return [...prev, ...response.files?.map((file, index) => {
+              return { ...file, index: startIndex + index }
+            }) ?? []]
           })
         }
 
@@ -105,19 +118,16 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
   }, [apiClient])
 
   const uploadFile = useCallback(async (path: string) => {
-    setError(undefined)
-
     try {
-      const file = await filesClient.upload(path)
-      setDirectoryContents(prev => [...prev, { name: file.name, isDir: false }])
+      await filesClient.upload(path)
+
+      refreshFiles()
     } catch (e) {
       setError(new Error(`Failed to upload file.: ${String(e)}`))
     }
   }, [filesClient])
 
   const downloadFile = useCallback(async (path: string) => {
-    setError(undefined)
-
     try {
       filesClient.download(path)
     } catch (e) {
@@ -126,8 +136,6 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
   }, [filesClient])
 
   const getFileInfo = useCallback(async (path: string): Promise<FileInfo | undefined> => {
-    setError(undefined)
-
     try {
       return await apiClient.info(path)
     } catch (e) {
@@ -136,24 +144,20 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
   }, [apiClient])
 
   const deleteFile = useCallback(async (path: string) => {
-    setError(undefined)
-
     try {
       await apiClient.remove(path)
 
-      const fileName = path.split('/').pop() ?? ''
-      setDirectoryContents(prev => prev.filter(file => file.name !== fileName))
+      refreshFiles()
     } catch (e) {
       setError(new Error(`Failed to delete file.: ${String(e)}`))
     }
   }, [apiClient])
 
   const makeDirectory = useCallback(async (path: string) => {
-    setError(undefined)
-
     try {
       await apiClient.mkdir(path)
-      setDirectoryContents(prev => [...prev, { name: path.split('/').pop() ?? '', isDir: true }])
+
+      refreshFiles()
     } catch (e) {
       setError(new Error(`Failed to make directory.: ${String(e)}`))
     }
@@ -168,5 +172,5 @@ export const useFileManagement = (baseURL: string): UseFileManagement => {
     }
   }, [])
 
-  return { directoryContents, error, resetFilesState, loadFiles, uploadFile, downloadFile, getFileInfo, deleteFile, makeDirectory }
+  return { directoryContents, error, refreshFiles, loadFiles, uploadFile, downloadFile, getFileInfo, deleteFile, makeDirectory }
 }

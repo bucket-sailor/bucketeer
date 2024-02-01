@@ -16,19 +16,33 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package pathcleaner
+package util
 
 import (
-	gopath "path"
-	"strings"
+	"fmt"
+	"net"
+	"time"
+
+	"github.com/labstack/echo/v4"
 )
 
-func Clean(path string) string {
-	if len(path) >= 0 {
-		path = strings.TrimPrefix(gopath.Clean(path), "/")
+func WaitForServerReady(e *echo.Echo, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for now := time.Now(); now.Before(deadline); now = <-ticker.C {
+		if e.Listener == nil {
+			continue
+		}
+
+		address := e.Listener.Addr().String()
+		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
 	}
-	if len(path) == 0 {
-		path = "."
-	}
-	return path
+
+	return fmt.Errorf("server did not start within deadline")
 }

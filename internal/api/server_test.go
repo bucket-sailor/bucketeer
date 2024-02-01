@@ -30,10 +30,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bucket-sailor/bucketeer/internal/api"
+	"github.com/bucket-sailor/bucketeer/internal/api/v1alpha1"
+	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/writablefs/dir"
-	"github.com/dpeckett/bucketeer/internal/api"
-	"github.com/dpeckett/bucketeer/internal/api/v1alpha1"
-	"github.com/dpeckett/bucketeer/internal/utils/testutils"
 	"github.com/labstack/echo/v4"
 	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +45,7 @@ func TestAPIServer(t *testing.T) {
 
 	testDir := t.TempDir()
 
-	fs, err := dir.FS(testDir)
+	fs, err := dir.NewFS(testDir)
 	require.NoError(t, err)
 
 	s := api.NewServer(logger, fs)
@@ -65,7 +65,7 @@ func TestAPIServer(t *testing.T) {
 		}
 	}()
 
-	require.NoError(t, testutils.WaitForServerReady(e, 5*time.Second))
+	require.NoError(t, util.WaitForServerReady(e, 5*time.Second))
 
 	url := fmt.Sprintf("http://%s/api/v1alpha1/fs", e.Listener.Addr().String())
 

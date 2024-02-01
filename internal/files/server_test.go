@@ -27,14 +27,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/bucket-sailor/bucketeer/internal/files"
+	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/windlass"
+	"github.com/bucket-sailor/writablefs"
 	"github.com/bucket-sailor/writablefs/dir"
-	"github.com/dpeckett/bucketeer/internal/files"
-	"github.com/dpeckett/bucketeer/internal/utils/testutils"
 	"github.com/labstack/echo/v4"
 	"github.com/neilotoole/slogt"
 	"github.com/stretchr/testify/require"
@@ -43,10 +43,14 @@ import (
 func TestFilesServer(t *testing.T) {
 	logger := slogt.New(t)
 
-	fs, err := dir.FS(t.TempDir())
+	fs, err := dir.NewFS(t.TempDir())
 	require.NoError(t, err)
 
-	s := files.NewServer(logger, fs)
+	s, err := files.NewServer(logger, fs)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, s.Close())
+	})
 
 	e := echo.New()
 	e.HideBanner = true
@@ -63,7 +67,7 @@ func TestFilesServer(t *testing.T) {
 		}
 	}()
 
-	require.NoError(t, testutils.WaitForServerReady(e, 5*time.Second))
+	require.NoError(t, util.WaitForServerReady(e, 5*time.Second))
 
 	url := fmt.Sprintf("http://%s/files", e.Listener.Addr().String())
 
@@ -94,7 +98,7 @@ func TestFilesServer(t *testing.T) {
 		err = fs.MkdirAll("testdir/subdir1")
 		require.NoError(t, err)
 
-		f, err := fs.OpenFile("testdir/subdir1/foo.txt", os.O_CREATE|os.O_WRONLY)
+		f, err := fs.OpenFile("testdir/subdir1/foo.txt", writablefs.O_CREATE|writablefs.O_WRONLY)
 		require.NoError(t, err)
 
 		_, err = f.Write([]byte("test1"))
@@ -105,7 +109,7 @@ func TestFilesServer(t *testing.T) {
 		err = fs.MkdirAll("testdir/subdir2")
 		require.NoError(t, err)
 
-		f, err = fs.OpenFile("testdir/subdir2/bar.txt", os.O_CREATE|os.O_WRONLY)
+		f, err = fs.OpenFile("testdir/subdir2/bar.txt", writablefs.O_CREATE|writablefs.O_WRONLY)
 		require.NoError(t, err)
 
 		_, err = f.Write([]byte("test2"))

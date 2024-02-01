@@ -1,10 +1,10 @@
-module github.com/dpeckett/bucketeer
+module github.com/bucket-sailor/bucketeer
 
 go 1.21.0
 
 require (
 	github.com/bucket-sailor/windlass v0.8.0
-	github.com/bucket-sailor/writablefs v0.8.1
+	github.com/bucket-sailor/writablefs v0.9.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/neilotoole/slogt v1.1.0
@@ -36,15 +36,21 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/samber/lo v1.38.1 // indirect
+	github.com/samber/slog-echo v1.12.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	go.opentelemetry.io/otel v1.22.0 // indirect
+	go.opentelemetry.io/otel/trace v1.22.0 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
+	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

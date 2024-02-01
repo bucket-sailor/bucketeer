@@ -29,7 +29,7 @@ class Client {
 
   public download (path: string): void {
     const a = document.createElement('a')
-    a.href = `${this.url}/${path}`
+    a.href = encodeURI(`${this.url}/${path}`)
     a.setAttribute('download', '')
     a.style.display = 'none'
 
@@ -57,7 +57,8 @@ class Client {
           return
         }
 
-        this.uploadClient.upload(`${directory}/${file.name}`, file).then(() => {
+        const path = (directory !== '' ? directory + '/' : '') + file.name
+        this.uploadClient.upload(path, file).then(() => {
           resolve(file)
         }).catch((error) => {
           reject(error)

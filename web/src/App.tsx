@@ -16,9 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ListItemIcon, useTheme, useMediaQuery, Menu, MenuItem } from '@mui/material'
+import { Alert, Box, ListItemIcon, useTheme, useMediaQuery, Menu, MenuItem } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -31,6 +31,7 @@ import FilePropertiesModal from './components/FilePropertiesModal'
 import FileGrid from './components/FileGrid'
 
 import styles from './App.module.css'
+import type InfiniteLoader from 'react-window-infinite-loader'
 
 // defined in vite.config.ts
 const basePath = '/browse/'
@@ -42,8 +43,26 @@ const App = (): React.ReactElement => {
   const theme = useTheme()
   const smallScreen = useMediaQuery(theme.breakpoints.down('md'))
 
-  const backendBaseURL = 'http://localhost:8082'
-  const { directoryContents, resetFilesState, loadFiles, uploadFile, downloadFile, getFileInfo, deleteFile, makeDirectory } = useFileManagement(backendBaseURL)
+  let baseURL: string
+  if (import.meta.env.PROD) {
+    baseURL = window.location.origin
+  } else {
+    baseURL = 'http://localhost:8082'
+  }
+
+  const fileGridLoaderRef = useRef<InfiniteLoader | null>(null)
+
+  const {
+    directoryContents,
+    error: fileManagementError,
+    refreshFiles,
+    loadFiles,
+    uploadFile,
+    downloadFile,
+    getFileInfo,
+    deleteFile,
+    makeDirectory
+  } = useFileManagement({ baseURL, fileGridLoaderRef })
 
   const [currentDirectory, setCurrentDirectory] = useState<string | undefined>(undefined)
   const [selectedFile, setSelectedFile] = useState<string | undefined>(undefined)
@@ -64,7 +83,13 @@ const App = (): React.ReactElement => {
   }
 
   const handleFileDoubleClick = useCallback((fileName: string): void => {
-    const file = directoryContents.find((item) => item.name === fileName)
+    let file: FileInfo | undefined
+    directoryContents.forEach((value, _) => {
+      if (value.name === fileName) {
+        file = value
+      }
+    })
+
     if (file !== undefined && file.isDir) {
       let currentPath = (params['*'] ?? '')
       if (!currentPath.endsWith('/')) {
@@ -90,7 +115,8 @@ const App = (): React.ReactElement => {
     handleFileMenuClose()
 
     if (currentDirectory !== undefined && selectedFile !== undefined) {
-      downloadFile(currentDirectory + '/' + selectedFile).catch((error) => {
+      const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + selectedFile
+      downloadFile(path).catch((error) => {
         console.error(error)
       })
     }
@@ -109,7 +135,8 @@ const App = (): React.ReactElement => {
     handleCloseDeleteModal()
 
     if (currentDirectory !== undefined && selectedFile !== undefined) {
-      deleteFile(currentDirectory + '/' + selectedFile).catch((error) => {
+      const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + selectedFile
+      deleteFile(path).catch((error) => {
         console.error(error)
       })
     }
@@ -120,7 +147,8 @@ const App = (): React.ReactElement => {
     setIsPropertiesModalOpen(true)
 
     if (currentDirectory !== undefined && selectedFile !== undefined) {
-      getFileInfo(currentDirectory + '/' + selectedFile).then((response) => {
+      const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + selectedFile
+      getFileInfo(path).then((response) => {
         if (response !== undefined) {
           setSelectedFileInfo(response)
         }
@@ -137,7 +165,8 @@ const App = (): React.ReactElement => {
 
   const handleCreateDirectory = useCallback((directoryName: string): void => {
     if (currentDirectory !== undefined) {
-      makeDirectory(currentDirectory + '/' + directoryName).then(() => { }).catch((error) => {
+      const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + directoryName
+      makeDirectory(path).then(() => {}).catch((error) => {
         console.error(error)
       })
     }
@@ -151,10 +180,8 @@ const App = (): React.ReactElement => {
     }
   }, [currentDirectory])
 
+  // Catch navigation events and update the current directory.
   useEffect(() => {
-    // Reset the pagination state (and abort any pending requests).
-    resetFilesState()
-
     // clear the selected file.
     setSelectedFile(undefined)
 
@@ -165,7 +192,7 @@ const App = (): React.ReactElement => {
   return (
     <>
       <NavBar smallScreen={smallScreen} basePath={basePath} currentDirectory={currentDirectory} />
-      <div className={styles.content}>
+      <Box className={styles.content}>
         <SideBar
           smallScreen={smallScreen}
           basePath={basePath}
@@ -203,17 +230,25 @@ const App = (): React.ReactElement => {
           </MenuItem>
         </Menu>
 
-        <FileGrid
-          smallScreen={smallScreen}
-          currentDirectory={currentDirectory}
-          directoryContents={directoryContents}
-          selectedFile={selectedFile}
-          onFileClick={handleFileClick}
-          onFileDoubleClick={handleFileDoubleClick}
-          onFileMenuOpen={handleFileMenuOpen}
-          loadFiles={loadFiles}
-        />
-      </div >
+        <Box className={styles.fileGrid}>
+          {fileManagementError !== undefined && (
+            <Alert severity="error" className={styles.errorAlert}>{fileManagementError.message}</Alert>
+          )}
+
+          <FileGrid
+            ref={fileGridLoaderRef}
+            smallScreen={smallScreen}
+            currentDirectory={currentDirectory}
+            directoryContents={directoryContents}
+            selectedFile={selectedFile}
+            refreshFiles={refreshFiles}
+            onFileClick={handleFileClick}
+            onFileDoubleClick={handleFileDoubleClick}
+            onFileMenuOpen={handleFileMenuOpen}
+            loadFiles={loadFiles}
+          />
+        </Box>
+      </Box >
 
       <ConfirmDeleteModal
         open={isDeleteModalOpen}

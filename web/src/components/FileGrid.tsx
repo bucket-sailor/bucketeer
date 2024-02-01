@@ -16,47 +16,59 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { createContext, useCallback, useContext, useEffect } from 'react'
+import React, { type ForwardedRef, createContext, forwardRef, useCallback, useContext, useEffect, useMemo } from 'react'
 import { FixedSizeGrid as Grid, type GridChildComponentProps } from 'react-window'
 import AutoSizer from 'react-virtualized-auto-sizer'
 import InfiniteLoader from 'react-window-infinite-loader'
 import { Box } from '@mui/material'
-import { type FileInfo } from '../api/client'
 import FileItem from './FileItem'
 
 import styles from './FileGrid.module.css'
+import { type FileInfoWithIndex } from '../hooks/FileManagement'
 
 interface FileGridProps extends React.HTMLAttributes<HTMLElement> {
   smallScreen: boolean
   currentDirectory?: string
-  directoryContents: FileInfo[]
+  directoryContents: FileInfoWithIndex[]
   selectedFile?: string
+  refreshFiles: () => void
   onFileClick: (fileName: string) => void
   onFileDoubleClick: (fileName: string) => void
   onFileMenuOpen: (anchorEl: HTMLElement, fileName: string) => void
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
 }
 
-const FileGrid: React.FC<FileGridProps> = ({ smallScreen, currentDirectory, directoryContents, selectedFile, onFileClick, onFileDoubleClick, onFileMenuOpen, loadFiles, ...props }: FileGridProps) => {
+const FileGrid = forwardRef(({ smallScreen, currentDirectory, directoryContents, selectedFile, refreshFiles, onFileClick, onFileDoubleClick, onFileMenuOpen, loadFiles, ...props }: FileGridProps, ref: ForwardedRef<InfiniteLoader>) => {
   // We don't know ahead of time how many files there are.
   const itemCountInfinity = 1000000
 
-  useEffect(() => {
-    // Kick off the initial load.
-    if (currentDirectory !== undefined) {
-      loadMoreItems(0, 20).then(() => { }).catch((error) => {
-        console.error(error)
-      })
-    }
-  }, [currentDirectory])
+  // Because its an associative array, we can't just use the length.
+  const directoryContentsSize = useMemo((): number => {
+    let highestIndex = -Infinity
+    directoryContents.forEach((_, index) => {
+      if (index > highestIndex) {
+        highestIndex = index
+      }
+    })
+
+    return highestIndex === -Infinity ? 0 : highestIndex + 1
+  }, [directoryContents])
 
   const isItemLoaded = useCallback((index: number): boolean => {
-    return directoryContents.length !== 0 && index < directoryContents.length
+    const fileInfo = directoryContents.find((fileInfo) => fileInfo.index === index)
+    return fileInfo !== undefined
   }, [directoryContents])
 
   const loadMoreItems = useCallback(async (startIndex: number, stopIndex: number): Promise<void> => {
     if (currentDirectory !== undefined) {
       await loadFiles(currentDirectory, startIndex, stopIndex)
+    }
+  }, [currentDirectory])
+
+  // Trigger a refresh of the files when the current directory changes.
+  useEffect(() => {
+    if (currentDirectory !== undefined) {
+      refreshFiles()
     }
   }, [currentDirectory])
 
@@ -79,6 +91,7 @@ const FileGrid: React.FC<FileGridProps> = ({ smallScreen, currentDirectory, dire
 
           return (
             <InfiniteLoader
+              ref={ref}
               isItemLoaded={isItemLoaded}
               itemCount={itemCountInfinity}
               loadMoreItems={loadMoreItems}
@@ -91,7 +104,7 @@ const FileGrid: React.FC<FileGridProps> = ({ smallScreen, currentDirectory, dire
                     height={height}
                     columnCount={columnCount}
                     columnWidth={(width - gutterSize) / columnCount}
-                    rowCount={Math.ceil(directoryContents.length / columnCount) + 1}
+                    rowCount={Math.ceil(directoryContentsSize / columnCount) + 1}
                     rowHeight={195 + gutterSize}
                     onItemsRendered={({ visibleRowStartIndex, visibleRowStopIndex, visibleColumnStartIndex, visibleColumnStopIndex, overscanRowStartIndex, overscanRowStopIndex }) => {
                       const startIdx = visibleRowStartIndex * columnCount + visibleColumnStartIndex
@@ -113,7 +126,8 @@ const FileGrid: React.FC<FileGridProps> = ({ smallScreen, currentDirectory, dire
       </AutoSizer>
     </Box >
   )
-}
+})
+FileGrid.displayName = 'FileGrid'
 
 const FileGridCell: React.FC<GridChildComponentProps> = ({
   columnIndex,
@@ -122,7 +136,8 @@ const FileGridCell: React.FC<GridChildComponentProps> = ({
 }: GridChildComponentProps) => {
   const { columnCount, gutterSize, directoryContents, selectedFile, onFileClick, onFileDoubleClick, onFileMenuOpen } = useContext(FileGridContext)
 
-  const fileInfo = directoryContents[rowIndex * columnCount + columnIndex]
+  const index = rowIndex * columnCount + columnIndex
+  const fileInfo = directoryContents.find((fileInfo) => fileInfo.index === index)
   if (fileInfo === undefined) {
     return (<div style={style} />)
   }
@@ -150,7 +165,7 @@ const FileGridCell: React.FC<GridChildComponentProps> = ({
 interface FileGridContextValue {
   columnCount: number
   gutterSize: number
-  directoryContents: FileInfo[]
+  directoryContents: FileInfoWithIndex[]
   selectedFile?: string
   onFileClick: (fileName: string) => void
   onFileDoubleClick: (fileName: string) => void

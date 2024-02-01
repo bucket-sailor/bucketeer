@@ -25,13 +25,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 
+	"github.com/bucket-sailor/bucketeer/internal/api/v1alpha1"
 	"github.com/bucket-sailor/windlass"
 	"github.com/bucket-sailor/writablefs"
 	"github.com/bucket-sailor/writablefs/dir"
-	"github.com/dpeckett/bucketeer/internal/api/v1alpha1"
-	"github.com/dpeckett/bucketeer/internal/utils/pathcleaner"
 
 	"github.com/labstack/echo/v4"
 )
@@ -75,11 +75,15 @@ func (s *Server) Register(e *echo.Echo) {
 }
 
 func (s *Server) download(c echo.Context) error {
-	path := pathcleaner.Clean(c.Param("path"))
+	path, err := url.PathUnescape(c.Param("path"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: err.Error()})
+	}
 
-	f, err := s.fsys.OpenFile(path, writablefs.O_RDONLY)
+	fi, err := s.fsys.Stat(path)
 	if err != nil {
 		// Try listing to see if it's a directory.
+		// Some filesystems (e.g. S3) don't support Stat() but do support ReadDir() for directories.
 		if _, err := s.fsys.ReadDir(path); err == nil {
 			return s.downloadDirectory(c, path)
 		}
@@ -90,12 +94,20 @@ func (s *Server) download(c echo.Context) error {
 
 		return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 	}
-	defer f.Close()
 
-	fi, err := f.Stat()
+	if fi.IsDir() {
+		return s.downloadDirectory(c, path)
+	}
+
+	f, err := s.fsys.OpenFile(path, writablefs.O_RDONLY)
 	if err != nil {
+		if errors.Is(err, writablefs.ErrNotExist) {
+			return c.NoContent(http.StatusNotFound)
+		}
+
 		return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 	}
+	defer f.Close()
 
 	// Don't attempt to preview the file in the browser.
 	c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fi.Name()))

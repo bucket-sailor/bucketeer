@@ -17,40 +17,59 @@
  */
 
 import React from 'react'
-import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, useTheme } from '@mui/material'
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, TextField, useTheme } from '@mui/material'
+import { useForm, type FieldValues, type SubmitHandler } from 'react-hook-form'
 
-interface ConfirmDeleteModalProps extends React.HTMLAttributes<HTMLElement> {
+interface ConfirmDeleteModalProps {
   open: boolean
   onClose: () => void
   onConfirm: () => void
 }
 
-const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ open, onClose, onConfirm, ...props }) => {
+const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ open, onClose, onConfirm }) => {
   const theme = useTheme()
+  const { handleSubmit } = useForm()
 
+  const onSubmit: SubmitHandler<FieldValues> = () => {
+    onConfirm()
+  }
+
+  // disableRestoreFocus is a workaround for: https://github.com/mui/material-ui/issues/33004
   return (
         <Dialog
+            disableRestoreFocus
             open={open}
             onClose={onClose}
             PaperProps={{
               style: { minWidth: theme.spacing(50), userSelect: 'none' }
             }}
-            {...props}
         >
-            <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    Are you sure you want to delete this file?
-                </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} sx={{ color: (theme) => theme.palette.grey[600] }}>
-                    Cancel
-                </Button>
-                <Button onClick={onConfirm} color="primary">
-                    Confirm
-                </Button>
-            </DialogActions>
+            <form onSubmit={(event) => {
+              event.preventDefault()
+              void handleSubmit(onSubmit)(event)
+            }}>
+                {/* A little hack to allow the user to use keyboard shortcuts. */}
+                <TextField
+                    autoFocus
+                    style={{ position: 'absolute', opacity: 0, height: 0 }}
+                    aria-hidden="true"
+                    id="hidden"
+                />
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete this file?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button type="button" onClick={onClose} sx={{ color: (theme) => theme.palette.grey[600] }}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" color="primary">
+                        Confirm
+                    </Button>
+                </DialogActions>
+            </form>
         </Dialog>
   )
 }
