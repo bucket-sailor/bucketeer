@@ -1,12 +1,12 @@
 # Bucketeer
 
-The ultimate S3 bucket explorer.
+![demo](./assets/demo.gif)
 
 ## Features
 
 * Web based UI.
-* Run locally or in the cloud.
-* Upload/download files (without limits).
+* Run locally or in a container.
+* Upload/download files (without size limits).
 * Large directory support.
 
 ## License
