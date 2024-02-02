@@ -4,7 +4,7 @@ go 1.21.0
 
 require (
 	github.com/bucket-sailor/windlass v0.8.0
-	github.com/bucket-sailor/writablefs v0.9.0
+	github.com/bucket-sailor/writablefs v0.9.8
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/neilotoole/slogt v1.1.0

@@ -41,7 +41,7 @@ const App = (): React.ReactElement => {
   const navigate = useNavigate()
 
   const theme = useTheme()
-  const smallScreen = useMediaQuery(theme.breakpoints.down('md'))
+  const sideBarCollapsed = useMediaQuery(theme.breakpoints.down('md'))
 
   let baseURL: string
   if (import.meta.env.PROD) {
@@ -90,13 +90,20 @@ const App = (): React.ReactElement => {
       }
     })
 
-    if (file !== undefined && file.isDir) {
-      let currentPath = (params['*'] ?? '')
-      if (!currentPath.endsWith('/')) {
-        currentPath += '/'
-      }
+    if (file !== undefined) {
+      if (file.isDir) {
+        let currentPath = (params['*'] ?? '')
+        if (!currentPath.endsWith('/')) {
+          currentPath += '/'
+        }
 
-      navigate(`${currentPath}${fileName}`)
+        navigate(`${currentPath}${fileName}`)
+      } else {
+        const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + fileName
+        downloadFile(path).catch((error) => {
+          console.error(error)
+        })
+      }
     }
   }, [directoryContents, params, navigate])
 
@@ -191,10 +198,10 @@ const App = (): React.ReactElement => {
 
   return (
     <>
-      <NavBar smallScreen={smallScreen} basePath={basePath} currentDirectory={currentDirectory} />
+      <NavBar sideBarCollapsed={sideBarCollapsed} basePath={basePath} currentDirectory={currentDirectory} />
       <Box className={styles.content}>
         <SideBar
-          smallScreen={smallScreen}
+          sideBarCollapsed={sideBarCollapsed}
           basePath={basePath}
           onCreateDirectory={handleCreateDirectory}
           onUploadFile={handleFileUpload}
@@ -237,7 +244,7 @@ const App = (): React.ReactElement => {
 
           <FileGrid
             ref={fileGridLoaderRef}
-            smallScreen={smallScreen}
+            sideBarCollapsed={sideBarCollapsed}
             currentDirectory={currentDirectory}
             directoryContents={directoryContents}
             selectedFile={selectedFile}

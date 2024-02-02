@@ -21,6 +21,7 @@ package api
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -41,16 +42,17 @@ const (
 
 // Server is yet another remote filesystem API.
 type Server struct {
-	logger    *slog.Logger
-	fsys      writablefs.FS
-	listCache *expirable.LRU[string, []v1alpha1.FileInfo]
+	logger *slog.Logger
+	fsys   writablefs.FS
+	// Cache for directory listings (in the future this should support being stored in Redis etc.).
+	listCache *expirable.LRU[string, []v1alpha1.FileInfoWithIndex]
 }
 
 func NewServer(logger *slog.Logger, fsys writablefs.FS) *Server {
 	return &Server{
 		logger:    logger,
 		fsys:      fsys,
-		listCache: expirable.NewLRU[string, []v1alpha1.FileInfo](listCacheMaxSize, nil, listCacheTTL),
+		listCache: expirable.NewLRU[string, []v1alpha1.FileInfoWithIndex](listCacheMaxSize, nil, listCacheTTL),
 	}
 }
 
@@ -101,20 +103,27 @@ func (s *Server) List(c echo.Context) error {
 		}
 	}
 
-	populateCache := func(id string) ([]v1alpha1.FileInfo, error) {
+	populateCache := func(id string) ([]v1alpha1.FileInfoWithIndex, error) {
 		entries, err := s.fsys.ReadDir(c.QueryParam("path"))
 		if err != nil {
-			return nil, echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
+			if errors.Is(err, writablefs.ErrNotExist) {
+				return nil, fmt.Errorf("unable to list directory: %w", err)
+			}
+
+			return nil, err
 		}
 
-		files := make([]v1alpha1.FileInfo, len(entries))
+		files := make([]v1alpha1.FileInfoWithIndex, len(entries))
 		for i, entry := range entries {
 			fi, err := toFileInfo(entry)
 			if err != nil {
-				return nil, echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
+				return nil, err
 			}
 
-			files[i] = *fi
+			files[i] = v1alpha1.FileInfoWithIndex{
+				FileInfo: *fi,
+				Index:    i,
+			}
 		}
 
 		s.listCache.Add(id, files)
@@ -122,7 +131,7 @@ func (s *Server) List(c echo.Context) error {
 		return files, nil
 	}
 
-	var files []v1alpha1.FileInfo
+	var files []v1alpha1.FileInfoWithIndex
 
 	id := c.QueryParam("id")
 	if id == "" {
@@ -130,7 +139,11 @@ func (s *Server) List(c echo.Context) error {
 
 		files, err = populateCache(id)
 		if err != nil {
-			return err
+			if errors.Is(err, writablefs.ErrNotExist) {
+				return echo.NewHTTPError(http.StatusNotFound, v1alpha1.ErrorResponse{Message: err.Error()})
+			}
+
+			return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 		}
 	} else {
 		var ok bool
@@ -138,11 +151,16 @@ func (s *Server) List(c echo.Context) error {
 		if !ok {
 			files, err = populateCache(id)
 			if err != nil {
-				return err
+				if errors.Is(err, writablefs.ErrNotExist) {
+					return echo.NewHTTPError(http.StatusNotFound, v1alpha1.ErrorResponse{Message: err.Error()})
+				}
+
+				return echo.NewHTTPError(http.StatusInternalServerError, v1alpha1.ErrorResponse{Message: err.Error()})
 			}
 		}
 	}
 
+	// No pagination.
 	if startIndex == 0 && stopIndex == 0 {
 		return c.JSON(http.StatusOK, &v1alpha1.ListResponse{
 			ID:    id,
@@ -150,16 +168,25 @@ func (s *Server) List(c echo.Context) error {
 		})
 	}
 
-	if startIndex >= stopIndex {
+	// Bounds checking.
+	maxIndex := int64(len(files)) - 1
+	if len(files) == 0 || startIndex > maxIndex {
+		return c.JSON(http.StatusOK, &v1alpha1.ListResponse{
+			ID: id,
+		})
+	}
+
+	startIndex = min(max(startIndex, 0), maxIndex)
+	stopIndex = min(stopIndex, maxIndex)
+
+	if startIndex > stopIndex {
 		return echo.NewHTTPError(http.StatusBadRequest, v1alpha1.ErrorResponse{Message: "start index must be less than stop index"})
 	}
 
-	startIndex = min(max(startIndex, 0), int64(len(files)))
-	stopIndex = min(stopIndex, int64(len(files)))
-
 	return c.JSON(http.StatusOK, &v1alpha1.ListResponse{
-		ID:    id,
-		Files: files[startIndex:stopIndex],
+		ID: id,
+		// Stop index is inclusive.
+		Files: files[startIndex : stopIndex+1],
 	})
 }
 

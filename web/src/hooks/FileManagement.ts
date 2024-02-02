@@ -28,12 +28,8 @@ export interface UseFileManagementProps {
   fileGridLoaderRef: React.MutableRefObject<InfiniteLoader | null>
 }
 
-export interface FileInfoWithIndex extends FileInfo {
-  index: number
-}
-
 export interface UseFileManagement {
-  directoryContents: FileInfoWithIndex[]
+  directoryContents: Map<number, FileInfo>
   error: Error | undefined
   refreshFiles: () => void
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
@@ -45,10 +41,12 @@ export interface UseFileManagement {
 }
 
 export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagementProps): UseFileManagement => {
-  const [directoryContents, setDirectoryContents] = useState<FileInfoWithIndex[]>([])
+  const [directoryContents, setDirectoryContents] = useState<Map<number, FileInfo>>(new Map())
   const [error, setError] = useState<Error | undefined>(undefined)
 
-  // TODO: we shouldn't need to limit concurrency anymore (we'll keep it in the short term as it simplifies abort handling).
+  // TODO: we shouldn't need to limit concurrency anymore.
+  // we'll keep it in the short term as it simplifies abort handling
+  // (and prevents list id race conditions).
   const loadFilesQueueRef = useRef<PQueue>(new PQueue({ concurrency: 1 }))
   const loadFilesListIDRef = useRef<string | undefined>(undefined)
   const abortControllerRef = useRef<AbortController | undefined>(undefined)
@@ -74,7 +72,7 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
     setError(undefined)
 
     // Reset the directory contents.
-    setDirectoryContents([])
+    setDirectoryContents(new Map())
 
     if (fileGridLoaderRef.current !== null) {
       fileGridLoaderRef.current.resetloadMoreItemsCache(true)
@@ -97,14 +95,20 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
         const filesCount = response.files?.length ?? 0
         if (filesCount !== 0) {
           setDirectoryContents((prev) => {
-            return [...prev, ...response.files?.map((file, index) => {
-              return { ...file, index: startIndex + index }
-            }) ?? []]
+            const next = new Map(prev)
+
+            response.files?.forEach((fileInfo, _) => {
+              if (!next.has(fileInfo.index)) {
+                next.set(fileInfo.index, fileInfo)
+              }
+            })
+
+            return next
           })
         }
 
         // Are we done loading files?
-        return filesCount < (stopIndex - startIndex)
+        return filesCount < ((stopIndex + 1) - startIndex)
       } catch (e) {
         if (e instanceof Error && e.name !== 'AbortError') {
           setError(new Error(`Failed to load files: ${e.message}`))

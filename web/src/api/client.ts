@@ -24,13 +24,17 @@ export interface FileInfo {
   lastModified?: string
 }
 
+export interface FileInfoWithIndex extends FileInfo {
+  index: number
+}
+
 export interface ErrorResponse {
   message: string
 }
 
 export interface ListResponse {
   id: string
-  files?: FileInfo[]
+  files?: FileInfoWithIndex[]
 }
 
 export interface ClientOptions {

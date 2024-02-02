@@ -2,6 +2,13 @@
 
 The ultimate S3 bucket explorer.
 
+## Features
+
+* Web based UI.
+* Run locally or in the cloud.
+* Upload/download files (without limits).
+* Large directory support.
+
 ## License
 
 Bucketeer is dual licensed under the [AGPLv3](./LICENSE) and a commercial license.

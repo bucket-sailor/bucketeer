@@ -24,12 +24,12 @@ import { Box } from '@mui/material'
 import FileItem from './FileItem'
 
 import styles from './FileGrid.module.css'
-import { type FileInfoWithIndex } from '../hooks/FileManagement'
+import { type FileInfo } from '../api/client'
 
 interface FileGridProps extends React.HTMLAttributes<HTMLElement> {
-  smallScreen: boolean
+  sideBarCollapsed: boolean
   currentDirectory?: string
-  directoryContents: FileInfoWithIndex[]
+  directoryContents: Map<number, FileInfo>
   selectedFile?: string
   refreshFiles: () => void
   onFileClick: (fileName: string) => void
@@ -38,7 +38,7 @@ interface FileGridProps extends React.HTMLAttributes<HTMLElement> {
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
 }
 
-const FileGrid = forwardRef(({ smallScreen, currentDirectory, directoryContents, selectedFile, refreshFiles, onFileClick, onFileDoubleClick, onFileMenuOpen, loadFiles, ...props }: FileGridProps, ref: ForwardedRef<InfiniteLoader>) => {
+const FileGrid = forwardRef(({ sideBarCollapsed, currentDirectory, directoryContents, selectedFile, refreshFiles, onFileClick, onFileDoubleClick, onFileMenuOpen, loadFiles, ...props }: FileGridProps, ref: ForwardedRef<InfiniteLoader>) => {
   // We don't know ahead of time how many files there are.
   const itemCountInfinity = 1000000
 
@@ -55,8 +55,7 @@ const FileGrid = forwardRef(({ smallScreen, currentDirectory, directoryContents,
   }, [directoryContents])
 
   const isItemLoaded = useCallback((index: number): boolean => {
-    const fileInfo = directoryContents.find((fileInfo) => fileInfo.index === index)
-    return fileInfo !== undefined
+    return directoryContents.get(index) !== undefined
   }, [directoryContents])
 
   const loadMoreItems = useCallback(async (startIndex: number, stopIndex: number): Promise<void> => {
@@ -82,7 +81,7 @@ const FileGrid = forwardRef(({ smallScreen, currentDirectory, directoryContents,
           let totalGuttersWidth = width - (columnCount * desiredColumnWidth)
           let gutterSize = columnCount > 1 ? totalGuttersWidth / (columnCount - 1) : 0
 
-          if (!smallScreen && gutterSize < 12) {
+          if (!sideBarCollapsed && gutterSize < 12) {
             columnCount--
 
             totalGuttersWidth = width - (columnCount * desiredColumnWidth)
@@ -137,7 +136,7 @@ const FileGridCell: React.FC<GridChildComponentProps> = ({
   const { columnCount, gutterSize, directoryContents, selectedFile, onFileClick, onFileDoubleClick, onFileMenuOpen } = useContext(FileGridContext)
 
   const index = rowIndex * columnCount + columnIndex
-  const fileInfo = directoryContents.find((fileInfo) => fileInfo.index === index)
+  const fileInfo = directoryContents.get(index)
   if (fileInfo === undefined) {
     return (<div style={style} />)
   }
@@ -165,7 +164,7 @@ const FileGridCell: React.FC<GridChildComponentProps> = ({
 interface FileGridContextValue {
   columnCount: number
   gutterSize: number
-  directoryContents: FileInfoWithIndex[]
+  directoryContents: Map<number, FileInfo>
   selectedFile?: string
   onFileClick: (fileName: string) => void
   onFileDoubleClick: (fileName: string) => void
@@ -181,7 +180,7 @@ interface FileGridProviderProps {
 const FileGridContext = createContext<FileGridContextValue>({
   columnCount: 1,
   gutterSize: 0,
-  directoryContents: [],
+  directoryContents: new Map(),
   onFileClick: () => { },
   onFileDoubleClick: () => { },
   onFileMenuOpen: () => { }

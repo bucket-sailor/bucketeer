@@ -24,12 +24,12 @@ import BucketeerLogo from '../assets/bucketeer.svg'
 import styles from './NavBar.module.css'
 
 interface NavBarProps {
-  smallScreen: boolean
+  sideBarCollapsed: boolean
   basePath: string
   currentDirectory?: string
 }
 
-const NavBar: React.FC<NavBarProps> = ({ smallScreen, basePath, currentDirectory }) => {
+const NavBar: React.FC<NavBarProps> = ({ sideBarCollapsed, basePath, currentDirectory }) => {
   const navigate = useNavigate()
   const [pathParts, setPathParts] = useState<string[]>([])
 
@@ -46,7 +46,7 @@ const NavBar: React.FC<NavBarProps> = ({ smallScreen, basePath, currentDirectory
 
   return (
         <Box className={styles.navbar}>
-            <Box className={styles.navbox} sx={{ marginLeft: !smallScreen ? '260px' : 'auto' }}>
+            <Box className={styles.navbox} sx={{ marginLeft: !sideBarCollapsed ? '260px' : 'auto' }}>
                 <Box className={styles.logoContainer} onClick={() => { navigate(basePath) }}>
                     <img src={BucketeerLogo} alt="Bucketeer Logo" style={{ paddingRight: '4px', height: '0.8em' }} />
                     <Typography variant="body1">Bucketeer</Typography>

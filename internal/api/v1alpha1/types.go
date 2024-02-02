@@ -52,11 +52,24 @@ type FileInfo struct {
 	LastModified *Time  `json:"lastModified,omitempty"`
 }
 
+type FileInfoWithIndex struct {
+	FileInfo
+	// The position of the file in the complete directory listing.
+	// This is effectively a stable identifier for the file across
+	// multiple requests with the same list identifier.
+	Index int `json:"index"`
+}
+
 type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
 type ListResponse struct {
-	ID    string     `json:"id"`
-	Files []FileInfo `json:"files,omitempty"`
+	// ID is a unique identifier for the list. It can be used to
+	// retrieve the same list of files in a subsequent request.
+	// This avoids issues with unstable pagination.
+	ID string `json:"id"`
+	// Files is the list of files in the directory (limited to the
+	// optionally provided start and stop indexes).
+	Files []FileInfoWithIndex `json:"files,omitempty"`
 }

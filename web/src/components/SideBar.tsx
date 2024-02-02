@@ -31,13 +31,13 @@ import BucketeerLogo from '../assets/bucketeer.svg'
 import styles from './SideBar.module.css'
 
 interface SideBarProps extends React.HTMLAttributes<HTMLElement> {
-  smallScreen: boolean
+  sideBarCollapsed: boolean
   basePath: string
   onCreateDirectory: (directoryName: string) => void
   onUploadFile: () => void
 }
 
-const SideBar: React.FC<SideBarProps> = ({ smallScreen, basePath, onCreateDirectory, onUploadFile, ...props }) => {
+const SideBar: React.FC<SideBarProps> = ({ sideBarCollapsed, basePath, onCreateDirectory, onUploadFile, ...props }) => {
   const theme = useTheme()
   const navigate = useNavigate()
 
@@ -47,27 +47,27 @@ const SideBar: React.FC<SideBarProps> = ({ smallScreen, basePath, onCreateDirect
 
   return (
         <>
-            {smallScreen && !drawerOpen && (
+            {sideBarCollapsed && !drawerOpen && (
                 <IconButton className={styles.openButton} onClick={() => { setDrawerOpen(true) }}>
                     <ChevronRightIcon />
                 </IconButton>
             )}
 
             <Drawer
-                variant={smallScreen ? 'temporary' : 'persistent'}
+                variant={sideBarCollapsed ? 'temporary' : 'persistent'}
                 anchor="left"
-                open={smallScreen ? drawerOpen : true}
+                open={sideBarCollapsed ? drawerOpen : true}
                 onClose={() => { setDrawerOpen(false) }}
                 className={styles.sidebar}
 
                 PaperProps={{
                   className: styles.sidebarPaper,
                   sx: {
-                    marginTop: smallScreen ? '0' : '46px'
+                    marginTop: sideBarCollapsed ? '0' : '46px'
                   }
                 }}
                 {...props} >
-                {smallScreen && (
+                {sideBarCollapsed && (
                     <IconButton className={styles.closeButton} onClick={() => { setDrawerOpen(false) }}>
                         <ChevronLeftIcon />
                     </IconButton>
@@ -95,7 +95,7 @@ const SideBar: React.FC<SideBarProps> = ({ smallScreen, basePath, onCreateDirect
                             <ListItemIcon>
                                 <UploadFileOutlinedIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Upload file" />
+                            <ListItemText primary="Upload File" />
                         </ListItemButton>
                     </nav>
 
