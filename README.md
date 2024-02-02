@@ -1,10 +1,19 @@
 # Bucketeer
 
 ![demo](./assets/demo.gif)
+*Browsing a [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) bucket containg the Linux kernel source tree.*
+
+## Getting Started
+
+Assuming you have the [AWS CLI](https://aws.amazon.com/cli/) installed and configured:
+
+```shell
+bucketeer my-bucket
+```
 
 ## Features
 
-* Web based UI.
+* Intuitive Web based UI.
 * Run locally or in a container.
 * Upload/download files (without size limits).
 * Large directory support.
