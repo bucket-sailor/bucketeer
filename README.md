@@ -15,7 +15,7 @@ bucketeer my-bucket
 
 * Easy to use Web UI.
 * Run locally or as a container.
-* Upload/download files (without size limits).
+* Upload/download files (without limits).
 * Large directory support.
 
 ## License

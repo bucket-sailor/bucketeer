@@ -53,6 +53,8 @@ test-go:
   COPY go.* ./
   RUN go mod download
   COPY . .
+  RUN mkdir -p web/dist \
+    && echo 'hello' > web/dist/index.html
   RUN go test -coverprofile=coverage.out -v ./...
   SAVE ARTIFACT ./coverage.out AS LOCAL coverage.out
 
