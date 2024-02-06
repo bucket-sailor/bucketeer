@@ -17,7 +17,7 @@
  */
 
 import React from 'react'
-import { Box, Dialog, DialogContent, DialogTitle, Typography, Link, IconButton, useTheme } from '@mui/material'
+import { Box, Dialog, DialogContent, DialogTitle, IconButton, Link, Typography, useTheme } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import BucketeerLogo from '../assets/bucketeer.svg'
 

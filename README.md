@@ -5,7 +5,7 @@
 
 ## Getting Started
 
-Assuming you have the [AWS CLI](https://aws.amazon.com/cli/) installed and configured:
+Assuming you have the [AWS CLI](https://aws.amazon.com/cli/) installed and configured.
 
 ```shell
 bucketeer my-bucket
@@ -13,8 +13,8 @@ bucketeer my-bucket
 
 ## Features
 
-* Intuitive Web based UI.
-* Run locally or in a container.
+* Easy to use Web UI.
+* Run locally or as a container.
 * Upload/download files (without size limits).
 * Large directory support.
 

@@ -16,11 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createPromiseClient } from '@connectrpc/connect'
+import { createConnectTransport } from '@connectrpc/connect-web'
+import { StringValue } from '@bufbuild/protobuf'
 import type React from 'react'
-import { useState, useRef, useCallback, useEffect } from 'react'
-import PQueue from 'p-queue'
-import ApiClient, { type FileInfo } from '../api/client'
-import FilesClient from '../files/client'
+import { useCallback, useRef, useState } from 'react'
+import { type FileInfo } from '../gen/filesystem/v1alpha1/filesystem_pb'
+import { Filesystem } from '../gen/filesystem/v1alpha1/filesystem_connect'
+import UploadClient from '../upload/client'
 import type InfiniteLoader from 'react-window-infinite-loader'
 
 export interface UseFileManagementProps {
@@ -34,7 +37,7 @@ export interface UseFileManagement {
   refreshFiles: () => void
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
   uploadFile: (path: string) => Promise<void>
-  downloadFile: (path: string) => Promise<void>
+  downloadFile: (path: string) => void
   getFileInfo: (path: string) => Promise<FileInfo | undefined>
   deleteFile: (path: string) => Promise<void>
   makeDirectory: (path: string) => Promise<void>
@@ -44,27 +47,12 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
   const [directoryContents, setDirectoryContents] = useState<Map<number, FileInfo>>(new Map())
   const [error, setError] = useState<Error | undefined>(undefined)
 
-  // TODO: we shouldn't need to limit concurrency anymore.
-  // we'll keep it in the short term as it simplifies abort handling
-  // (and prevents list id race conditions).
-  const loadFilesQueueRef = useRef<PQueue>(new PQueue({ concurrency: 1 }))
   const loadFilesListIDRef = useRef<string | undefined>(undefined)
-  const abortControllerRef = useRef<AbortController | undefined>(undefined)
 
-  const apiClient = new ApiClient(baseURL)
-  const filesClient = new FilesClient(`${baseURL}/files`)
+  const filesystemClient = createPromiseClient(Filesystem, createConnectTransport({ baseUrl: baseURL + '/api' }))
+  const uploadClient = new UploadClient(baseURL)
 
   const refreshFiles = useCallback(() => {
-    // Remove any queued up requests, and create a new queue.
-    loadFilesQueueRef.current.clear()
-    loadFilesQueueRef.current = new PQueue({ concurrency: 1 })
-
-    // Abort any inflight requests.
-    if (abortControllerRef.current !== undefined) {
-      abortControllerRef.current.abort()
-    }
-    abortControllerRef.current = undefined
-
     // Reset the list ID.
     loadFilesListIDRef.current = undefined
 
@@ -80,101 +68,147 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
   }, [fileGridLoaderRef])
 
   const loadFiles = useCallback(async (path: string, startIndex: number, stopIndex: number): Promise<boolean> => {
-    const loadFilesPage = async (): Promise<boolean> => {
-      try {
-        abortControllerRef.current = new AbortController()
+    try {
+      // Generate a new list ID if we don't have one.
+      if (loadFilesListIDRef.current === undefined) {
+        loadFilesListIDRef.current = generateRandomID(8)
+        console.log('Generated new list ID:', loadFilesListIDRef.current)
+      }
 
-        const response = await apiClient.list(path, startIndex, stopIndex, loadFilesListIDRef.current, abortControllerRef.current)
-        if (abortControllerRef.current !== undefined && abortControllerRef.current.signal.aborted) {
-          // Don't attempt to load any more files if the request was aborted.
-          return true
-        }
+      const req = {
+        id: loadFilesListIDRef.current ?? '',
+        path,
+        startIndex: BigInt(startIndex),
+        stopIndex: BigInt(stopIndex)
+      }
 
-        loadFilesListIDRef.current = response.id
+      const response = await filesystemClient.readDir(req)
 
-        const filesCount = response.files?.length ?? 0
-        if (filesCount !== 0) {
-          setDirectoryContents((prev) => {
-            const next = new Map(prev)
-
-            response.files?.forEach((fileInfo, _) => {
-              if (!next.has(fileInfo.index)) {
-                next.set(fileInfo.index, fileInfo)
-              }
-            })
-
-            return next
-          })
-        }
-
-        // Are we done loading files?
-        return filesCount < ((stopIndex + 1) - startIndex)
-      } catch (e) {
-        if (e instanceof Error && e.name !== 'AbortError') {
-          setError(new Error(`Failed to load files: ${e.message}`))
-        }
-
+      // Is the request stale?
+      if (response.id !== loadFilesListIDRef.current) {
         return true
       }
-    }
 
-    return await loadFilesQueueRef.current.add(loadFilesPage) as boolean
-  }, [apiClient])
+      const filesCount = response.files?.length ?? 0
+      if (filesCount !== 0) {
+        setDirectoryContents((prev) => {
+          const next = new Map(prev)
 
-  const uploadFile = useCallback(async (path: string) => {
-    try {
-      await filesClient.upload(path)
+          response.files?.forEach((file, _) => {
+            if (!next.has(Number(file.index)) && file.fileInfo !== undefined) {
+              next.set(Number(file.index), file.fileInfo)
+            }
+          })
 
-      refreshFiles()
+          return next
+        })
+      }
+
+      // Are we done loading files?
+      return filesCount < ((stopIndex + 1) - startIndex)
     } catch (e) {
-      setError(new Error(`Failed to upload file.: ${String(e)}`))
-    }
-  }, [filesClient])
+      if (e instanceof Error && e.name !== 'AbortError') {
+        setError(new Error(`Failed to load files: ${e.message}`))
+      }
 
-  const downloadFile = useCallback(async (path: string) => {
-    try {
-      filesClient.download(path)
-    } catch (e) {
-      setError(new Error(`Failed to download file.: ${String(e)}`))
+      return true
     }
-  }, [filesClient])
+  }, [filesystemClient])
+
+  const downloadFile = useCallback((path: string) => {
+    const a = document.createElement('a')
+    a.href = encodeURI(`${baseURL}/files/download/${path}`)
+    a.setAttribute('download', '')
+    a.style.display = 'none'
+
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }, [baseURL])
+
+  const uploadFile = useCallback(async (directory: string) => {
+    await new Promise<void>((resolve, reject) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.style.display = 'none'
+      input.onchange = async (event) => {
+        if (event.target === null) {
+          document.body.removeChild(input)
+          reject(new Error('No input target found'))
+          return
+        }
+
+        const file = (event.target as HTMLInputElement).files?.[0]
+        if (file === undefined) {
+          document.body.removeChild(input)
+          reject(new Error('No file selected'))
+          return
+        }
+
+        const path = (directory !== '' ? directory + '/' : '') + file.name
+        uploadClient.upload(path, file).then(() => {
+          refreshFiles()
+          resolve()
+        }).catch((error) => {
+          reject(error)
+        }).finally(() => {
+          document.body.removeChild(input)
+        })
+      }
+
+      document.body.appendChild(input)
+      input.click()
+    })
+  }, [uploadClient])
 
   const getFileInfo = useCallback(async (path: string): Promise<FileInfo | undefined> => {
     try {
-      return await apiClient.info(path)
+      const req = new StringValue()
+      req.value = path
+
+      return await filesystemClient.stat(req)
     } catch (e) {
       setError(new Error(`Failed to get file info.: ${String(e)}`))
     }
-  }, [apiClient])
+  }, [filesystemClient])
 
   const deleteFile = useCallback(async (path: string) => {
     try {
-      await apiClient.remove(path)
+      const req = new StringValue()
+      req.value = path
+
+      await filesystemClient.removeAll(req)
 
       refreshFiles()
     } catch (e) {
       setError(new Error(`Failed to delete file.: ${String(e)}`))
     }
-  }, [apiClient])
+  }, [filesystemClient])
 
   const makeDirectory = useCallback(async (path: string) => {
     try {
-      await apiClient.mkdir(path)
+      const req = new StringValue()
+      req.value = path
+
+      await filesystemClient.mkdirAll(req)
 
       refreshFiles()
     } catch (e) {
       setError(new Error(`Failed to make directory.: ${String(e)}`))
     }
-  }, [apiClient])
-
-  // Abort any inflight requests when the component unmounts.
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current !== undefined) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, [])
+  }, [filesystemClient])
 
   return { directoryContents, error, refreshFiles, loadFiles, uploadFile, downloadFile, getFileInfo, deleteFile, makeDirectory }
+}
+
+const generateRandomID = (length: number): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const charactersLength = characters.length
+  let result = ''
+
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength))
+  }
+
+  return result
 }

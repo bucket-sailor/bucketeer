@@ -28,17 +28,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/bucket-sailor/bucketeer/internal/api"
-	"github.com/bucket-sailor/bucketeer/internal/files"
+	"github.com/bucket-sailor/bucketeer/internal/download"
+	"github.com/bucket-sailor/bucketeer/internal/filesystem"
+	"github.com/bucket-sailor/bucketeer/internal/upload"
 	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/bucketeer/web"
-	"github.com/bucket-sailor/writablefs/s3"
+	"github.com/bucket-sailor/writablefs/dirfs"
+	"github.com/bucket-sailor/writablefs/s3fs"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pkg/browser"
 	slogecho "github.com/samber/slog-echo"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/net/http2"
 )
 
 func main() {
@@ -162,7 +165,7 @@ func main() {
 				}
 			}
 
-			opts := s3.Options{
+			opts := s3fs.Options{
 				EndpointURL:     c.String("endpoint-url"),
 				Region:          c.String("region"),
 				TLSClientConfig: tlsClientConfig,
@@ -170,7 +173,7 @@ func main() {
 				BucketName:      bucketName,
 			}
 
-			fsys, err := s3.NewFS(c.Context, logger, opts)
+			fsys, err := s3fs.New(c.Context, logger, opts)
 			if err != nil {
 				return fmt.Errorf("failed to create s3 filesystem: %w", err)
 			}
@@ -185,7 +188,7 @@ func main() {
 				e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 					AllowOrigins: []string{"http://localhost:*"},
 					AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodPatch, http.MethodDelete},
-					AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, "Content-Range"},
+					AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, "Content-Range", "Connect-Protocol-Version"},
 				}))
 			}
 
@@ -210,18 +213,33 @@ func main() {
 			// Assets etc.
 			e.GET("/*", echo.WrapHandler(webFSServer))
 
-			// Handle /api requests.
-			apiServer := api.NewServer(logger, fsys)
-			apiServer.Register(e)
+			// Handle filesystem operations.
+			filesystemServerPath, filesystemServer := filesystem.NewServer(logger, fsys)
+			e.Any(filesystemServerPath+"*", echo.WrapHandler(filesystemServer))
 
 			// Handle bulk file transfers.
-			filesServer, err := files.NewServer(logger, fsys)
+			cacheDir, err := os.MkdirTemp("", "bucketeer-*")
 			if err != nil {
-				return fmt.Errorf("failed to create files server: %w", err)
+				return err
 			}
-			defer filesServer.Close()
+			defer os.RemoveAll(cacheDir)
 
-			filesServer.Register(e)
+			// S3 doesn't support partial file writes, so we need to stage files locally before
+			// uploading them.
+			cacheFS, err := dirfs.New(cacheDir)
+			if err != nil {
+				return err
+			}
+
+			// Handle file uploads.
+			uploadServerPath, uploadServer := upload.NewServer(logger, fsys, cacheFS)
+			e.Any(uploadServerPath+"*", echo.WrapHandler(uploadServer))
+
+			chunkServerPath, chunkServer := upload.NewChunkServer(logger, fsys, cacheFS)
+			e.Any(chunkServerPath, echo.WrapHandler(chunkServer))
+
+			downloadServerPath, downloadServer := download.NewServer(logger, fsys)
+			e.Any(downloadServerPath+"*", echo.WrapHandler(downloadServer))
 
 			if !c.Bool("non-interactive") {
 				go func() {
@@ -251,7 +269,7 @@ func main() {
 				}()
 			}
 
-			return e.Start(c.String("listen"))
+			return e.StartH2CServer(c.String("listen"), &http2.Server{})
 		},
 	}
 

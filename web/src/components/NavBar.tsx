@@ -41,7 +41,7 @@ const NavBar: React.FC<NavBarProps> = ({ sideBarCollapsed, basePath, currentDire
 
   const handleNavigateToPathPart = (index: number): void => {
     const path = basePath + pathParts.slice(0, index + 1).join('/')
-    navigate(path)
+    navigate(path + '/')
   }
 
   return (

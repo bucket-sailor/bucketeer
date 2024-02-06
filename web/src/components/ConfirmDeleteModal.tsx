@@ -17,8 +17,8 @@
  */
 
 import React from 'react'
-import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, TextField, useTheme } from '@mui/material'
-import { useForm, type FieldValues, type SubmitHandler } from 'react-hook-form'
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, useTheme } from '@mui/material'
+import { type FieldValues, type SubmitHandler, useForm } from 'react-hook-form'
 
 interface ConfirmDeleteModalProps {
   open: boolean

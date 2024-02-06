@@ -1,0 +1,67 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Copyright 2024 Damian Peckett <damian@pecke.tt>.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+syntax = "proto3";
+
+package bucketeer.upload.v1alpha1;
+
+option go_package = "github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+service Upload {
+  // New initiates a new upload and returns a unique identifier for the upload.
+  rpc New(NewRequest) returns (google.protobuf.StringValue);
+  // Abort aborts an upload and cleans up any resources associated with it.
+  rpc Abort(google.protobuf.StringValue) returns (google.protobuf.Empty);
+  // Complete begins the process of completing an upload, data isn't guaranteed
+  // to be flushed to disk until PollForCompletion() returns a status of
+  // COMPLETED. We split this into two calls to allow for the possibility of a
+  // long-running completion process (eg. transferring to remote storage).
+  rpc Complete(google.protobuf.StringValue) returns (google.protobuf.Empty);
+  // PollForCompletion polls for the completion of an upload (eg. has it been
+  // fully flushed to disk?)
+  rpc PollForCompletion(google.protobuf.StringValue) returns (CompleteResponse);
+}
+
+message NewRequest {
+  // The destination path of the uploaded file.
+  string path = 1;
+  // The total size of the uploaded file.
+  int64 size = 2;
+  // The expected checksum of the uploaded file in the format "algorithm:hex".
+  string checksum = 3;
+}
+
+// CompletionStatus is the status of an upload.
+enum CompletionStatus {
+  // The completion of the upload is still pending.
+  PENDING = 0;
+  // The upload has been completed is ready for downloads.
+  COMPLETED = 1;
+  // Completion of the upload failed.
+  FAILED = 2;
+}
+
+message CompleteResponse {
+  // The status of the upload.
+  CompletionStatus status = 1;
+  // The error message if the upload failed.
+  string error = 2;
+}

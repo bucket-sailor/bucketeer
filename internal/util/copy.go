@@ -16,23 +16,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import App from './App'
-import './index.css'
+package util
 
-import '@fontsource/roboto/300.css'
-import '@fontsource/roboto/400.css'
-import '@fontsource/roboto/500.css'
-import '@fontsource/roboto/700.css'
+import (
+	"io"
 
-ReactDOM.createRoot(document.getElementById('root') as Element).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/*" element={<App />} />
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
+	"github.com/bucket-sailor/writablefs"
 )
+
+func CopyFile(srcFS writablefs.FS, srcPath string, dstFS writablefs.FS, dstPath string) error {
+	src, err := srcFS.OpenFile(srcPath, writablefs.FlagReadOnly)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := dstFS.OpenFile(dstPath, writablefs.FlagWriteOnly|writablefs.FlagCreate)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
+}

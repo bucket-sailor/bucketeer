@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { type ForwardedRef, createContext, forwardRef, useCallback, useContext, useEffect, useMemo } from 'react'
+import React, { createContext, type ForwardedRef, forwardRef, useCallback, useContext, useEffect, useMemo } from 'react'
 import { FixedSizeGrid as Grid, type GridChildComponentProps } from 'react-window'
 import AutoSizer from 'react-virtualized-auto-sizer'
 import InfiniteLoader from 'react-window-infinite-loader'
@@ -24,7 +24,7 @@ import { Box } from '@mui/material'
 import FileItem from './FileItem'
 
 import styles from './FileGrid.module.css'
-import { type FileInfo } from '../api/client'
+import { type FileInfo } from '../gen/filesystem/v1alpha1/filesystem_pb'
 
 interface FileGridProps extends React.HTMLAttributes<HTMLElement> {
   sideBarCollapsed: boolean

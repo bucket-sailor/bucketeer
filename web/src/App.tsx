@@ -16,14 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Alert, Box, ListItemIcon, useTheme, useMediaQuery, Menu, MenuItem } from '@mui/material'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Alert, Box, ListItemIcon, Menu, MenuItem, useMediaQuery, useTheme } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import { useFileManagement } from './hooks/FileManagement'
-import type { FileInfo } from './api/client'
+import { type FileInfo } from './gen/filesystem/v1alpha1/filesystem_pb'
 import NavBar from './components/NavBar'
 import SideBar from './components/SideBar'
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
@@ -97,12 +97,10 @@ const App = (): React.ReactElement => {
           currentPath += '/'
         }
 
-        navigate(`${currentPath}${fileName}`)
+        navigate(`${currentPath}${fileName}/`)
       } else {
         const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + fileName
-        downloadFile(path).catch((error) => {
-          console.error(error)
-        })
+        downloadFile(path)
       }
     }
   }, [directoryContents, params, navigate])
@@ -123,9 +121,7 @@ const App = (): React.ReactElement => {
 
     if (currentDirectory !== undefined && selectedFile !== undefined) {
       const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + selectedFile
-      downloadFile(path).catch((error) => {
-        console.error(error)
-      })
+      downloadFile(path)
     }
   }, [currentDirectory, selectedFile])
 

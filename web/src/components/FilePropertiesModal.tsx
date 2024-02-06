@@ -17,8 +17,8 @@
  */
 
 import React from 'react'
-import { Dialog, DialogContent, DialogTitle, List, ListItem, ListItemText, Typography, IconButton, useTheme } from '@mui/material'
-import { type FileInfo } from '../api/client'
+import { Dialog, DialogContent, DialogTitle, IconButton, List, ListItem, ListItemText, Typography, useTheme } from '@mui/material'
+import { type FileInfo } from '../gen/filesystem/v1alpha1/filesystem_pb'
 import CloseIcon from '@mui/icons-material/Close'
 
 interface FilePropertiesModalProps extends React.HTMLAttributes<HTMLElement> {
@@ -60,13 +60,13 @@ const FilePropertiesModal: React.FC<FilePropertiesModalProps> = ({ open, onClose
             <ListItem>
               <ListItemText
                 primary={<Typography variant="subtitle2">Last Modified</Typography>}
-                secondary={fileInfo.lastModified}
+                secondary={fileInfo?.modTime?.toDate()?.toLocaleString()}
               />
             </ListItem>
             <ListItem>
               <ListItemText
                 primary={<Typography variant="subtitle2">Size</Typography>}
-                secondary={fileInfo.size}
+                secondary={Number(fileInfo.size)}
               />
             </ListItem>
           </>}
