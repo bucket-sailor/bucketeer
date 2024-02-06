@@ -20,7 +20,7 @@ syntax = "proto3";
 
 package bucketeer.filesystem.v1alpha1;
 
-option go_package = "github.com/bucket-sailor/bucketeer/gen/filesystem/v1alpha1";
+option go_package = "github.com/bucket-sailor/bucketeer/internal/gen/filesystem/v1alpha1";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";

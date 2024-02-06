@@ -25,7 +25,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1alpha1 "github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1"
+	v1alpha1 "github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 	http "net/http"

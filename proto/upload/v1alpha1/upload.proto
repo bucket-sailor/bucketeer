@@ -20,7 +20,7 @@ syntax = "proto3";
 
 package bucketeer.upload.v1alpha1;
 
-option go_package = "github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1";
+option go_package = "github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";

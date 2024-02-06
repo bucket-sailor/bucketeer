@@ -28,7 +28,7 @@ global.TextDecoder = TextDecoder
 
 fetchMock.enableMocks()
 
-describe('Windlass Client', () => {
+describe('Upload Client', () => {
   const baseURL = 'http://example.com'
 
   const client = new Client(baseURL, {

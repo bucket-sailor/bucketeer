@@ -28,8 +28,8 @@ import (
 	"runtime"
 
 	"connectrpc.com/connect"
-	"github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1"
-	"github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1/v1alpha1connect"
+	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1"
+	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1/v1alpha1connect"
 	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/queue"
 	"github.com/bucket-sailor/writablefs"

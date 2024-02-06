@@ -179,6 +179,7 @@ func main() {
 			}
 
 			e := echo.New()
+			e.HideBanner = true
 
 			e.Use(slogecho.New(logger))
 			e.Use(middleware.Recover())

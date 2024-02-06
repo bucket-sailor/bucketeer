@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/bucket-sailor/bucketeer/gen/filesystem/v1alpha1"
-	"github.com/bucket-sailor/bucketeer/gen/filesystem/v1alpha1/v1alpha1connect"
+	"github.com/bucket-sailor/bucketeer/internal/gen/filesystem/v1alpha1"
+	"github.com/bucket-sailor/bucketeer/internal/gen/filesystem/v1alpha1/v1alpha1connect"
 	"github.com/bucket-sailor/writablefs"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"google.golang.org/protobuf/types/known/emptypb"

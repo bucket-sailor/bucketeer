@@ -32,8 +32,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/avast/retry-go/v4"
-	"github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1"
-	"github.com/bucket-sailor/bucketeer/gen/upload/v1alpha1/v1alpha1connect"
+	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1"
+	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1/v1alpha1connect"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/jinzhu/copier"
