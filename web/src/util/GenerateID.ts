@@ -16,27 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package util
+export const generateID = (length: number): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const charactersLength = characters.length
+  let result = ''
 
-import (
-	"io"
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength))
+  }
 
-	"github.com/bucket-sailor/writablefs"
-)
-
-func CopyFile(srcFS writablefs.FS, srcPath string, dstFS writablefs.FS, dstPath string) error {
-	src, err := srcFS.OpenFile(srcPath, writablefs.FlagReadOnly)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	dst, err := dstFS.OpenFile(dstPath, writablefs.FlagWriteOnly|writablefs.FlagCreate)
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, src)
-	return err
+  return result
 }

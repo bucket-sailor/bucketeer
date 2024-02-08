@@ -18,13 +18,13 @@
 
 import { createPromiseClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
-import { StringValue } from '@bufbuild/protobuf'
 import type React from 'react'
 import { useCallback, useRef, useState } from 'react'
 import { type FileInfo } from '../gen/filesystem/v1alpha1/filesystem_pb'
 import { Filesystem } from '../gen/filesystem/v1alpha1/filesystem_connect'
-import UploadClient from '../upload/client'
+import UploadClient from '../upload/Client'
 import type InfiniteLoader from 'react-window-infinite-loader'
+import { generateID } from '../util/GenerateID'
 
 export interface UseFileManagementProps {
   baseURL: string
@@ -36,11 +36,11 @@ export interface UseFileManagement {
   error: Error | undefined
   refreshFiles: () => void
   loadFiles: (path: string, startIndex: number, stopIndex: number) => Promise<boolean>
-  uploadFile: (path: string) => Promise<void>
-  downloadFile: (path: string) => void
   getFileInfo: (path: string) => Promise<FileInfo | undefined>
   deleteFile: (path: string) => Promise<void>
   makeDirectory: (path: string) => Promise<void>
+  uploadFile: (path: string) => Promise<void>
+  downloadFile: (path: string) => void
 }
 
 export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagementProps): UseFileManagement => {
@@ -71,8 +71,7 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
     try {
       // Generate a new list ID if we don't have one.
       if (loadFilesListIDRef.current === undefined) {
-        loadFilesListIDRef.current = generateRandomID(8)
-        console.log('Generated new list ID:', loadFilesListIDRef.current)
+        loadFilesListIDRef.current = generateID(16)
       }
 
       const req = {
@@ -115,6 +114,34 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
     }
   }, [filesystemClient])
 
+  const getFileInfo = useCallback(async (path: string): Promise<FileInfo | undefined> => {
+    try {
+      return await filesystemClient.stat({ value: path })
+    } catch (e) {
+      setError(new Error(`Failed to get file info.: ${String(e)}`))
+    }
+  }, [filesystemClient])
+
+  const deleteFile = useCallback(async (path: string) => {
+    try {
+      await filesystemClient.removeAll({ value: path })
+
+      refreshFiles()
+    } catch (e) {
+      setError(new Error(`Failed to delete file.: ${String(e)}`))
+    }
+  }, [filesystemClient])
+
+  const makeDirectory = useCallback(async (path: string) => {
+    try {
+      await filesystemClient.mkdirAll({ value: path })
+
+      refreshFiles()
+    } catch (e) {
+      setError(new Error(`Failed to make directory.: ${String(e)}`))
+    }
+  }, [filesystemClient])
+
   const downloadFile = useCallback((path: string) => {
     const a = document.createElement('a')
     a.href = encodeURI(`${baseURL}/files/download/${path}`)
@@ -149,8 +176,8 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
         uploadClient.upload(path, file).then(() => {
           refreshFiles()
           resolve()
-        }).catch((error) => {
-          reject(error)
+        }).catch((e) => {
+          reject(e)
         }).finally(() => {
           document.body.removeChild(input)
         })
@@ -161,54 +188,5 @@ export const useFileManagement = ({ baseURL, fileGridLoaderRef }: UseFileManagem
     })
   }, [uploadClient])
 
-  const getFileInfo = useCallback(async (path: string): Promise<FileInfo | undefined> => {
-    try {
-      const req = new StringValue()
-      req.value = path
-
-      return await filesystemClient.stat(req)
-    } catch (e) {
-      setError(new Error(`Failed to get file info.: ${String(e)}`))
-    }
-  }, [filesystemClient])
-
-  const deleteFile = useCallback(async (path: string) => {
-    try {
-      const req = new StringValue()
-      req.value = path
-
-      await filesystemClient.removeAll(req)
-
-      refreshFiles()
-    } catch (e) {
-      setError(new Error(`Failed to delete file.: ${String(e)}`))
-    }
-  }, [filesystemClient])
-
-  const makeDirectory = useCallback(async (path: string) => {
-    try {
-      const req = new StringValue()
-      req.value = path
-
-      await filesystemClient.mkdirAll(req)
-
-      refreshFiles()
-    } catch (e) {
-      setError(new Error(`Failed to make directory.: ${String(e)}`))
-    }
-  }, [filesystemClient])
-
-  return { directoryContents, error, refreshFiles, loadFiles, uploadFile, downloadFile, getFileInfo, deleteFile, makeDirectory }
-}
-
-const generateRandomID = (length: number): string => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  const charactersLength = characters.length
-  let result = ''
-
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength))
-  }
-
-  return result
+  return { directoryContents, error, refreshFiles, loadFiles, getFileInfo, deleteFile, makeDirectory, uploadFile, downloadFile }
 }

@@ -84,7 +84,7 @@ func NewClient(logger *slog.Logger, baseURL string, opts *ClientOptions) (*Clien
 	}
 
 	return &Client{
-		logger:     logger,
+		logger:     logger.WithGroup("upload"),
 		baseURL:    baseURL,
 		httpClient: httpClient,
 		apiClient:  v1alpha1connect.NewUploadClient(httpClient, baseURL+"/api/"),

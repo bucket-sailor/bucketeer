@@ -18,6 +18,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import type InfiniteLoader from 'react-window-infinite-loader'
 import { Alert, Box, ListItemIcon, Menu, MenuItem, useMediaQuery, useTheme } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
@@ -29,26 +30,29 @@ import SideBar from './components/SideBar'
 import ConfirmDeleteModal from './components/ConfirmDeleteModal'
 import FilePropertiesModal from './components/FilePropertiesModal'
 import FileGrid from './components/FileGrid'
+import { useTelemetry } from './hooks/Telemetry'
+import { generateID } from './util/GenerateID'
 
 import styles from './App.module.css'
-import type InfiniteLoader from 'react-window-infinite-loader'
 
-// defined in vite.config.ts
-const basePath = '/browse/'
+interface AppProps {
+  baseURL: string
+  basePath: string
+}
 
-const App = (): React.ReactElement => {
+const App = ({ baseURL, basePath }: AppProps): React.ReactElement => {
   const params = useParams()
   const navigate = useNavigate()
 
   const theme = useTheme()
   const sideBarCollapsed = useMediaQuery(theme.breakpoints.down('md'))
 
-  let baseURL: string
-  if (import.meta.env.PROD) {
-    baseURL = window.location.origin
-  } else {
-    baseURL = 'http://localhost:8082'
-  }
+  const sessionID = useRef<string>(generateID(16))
+
+  const {
+    registerErrorHandlers,
+    reportEvent
+  } = useTelemetry({ baseURL, sessionID: sessionID.current })
 
   const fileGridLoaderRef = useRef<InfiniteLoader | null>(null)
 
@@ -57,11 +61,11 @@ const App = (): React.ReactElement => {
     error: fileManagementError,
     refreshFiles,
     loadFiles,
-    uploadFile,
-    downloadFile,
     getFileInfo,
     deleteFile,
-    makeDirectory
+    makeDirectory,
+    uploadFile,
+    downloadFile
   } = useFileManagement({ baseURL, fileGridLoaderRef })
 
   const [currentDirectory, setCurrentDirectory] = useState<string | undefined>(undefined)
@@ -72,6 +76,42 @@ const App = (): React.ReactElement => {
   const [fileMenuAnchorEl, setFileMenuAnchorEl] = useState<HTMLElement | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false)
+
+  // For statistical purposes.
+  const isMobile = useMediaQuery('(max-width:600px)')
+  const isTablet = useMediaQuery('(min-width:601px) and (max-width:900px)')
+  const isHighDPI = useMediaQuery('(-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi)')
+
+  useEffect(() => {
+    let deviceType = isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'
+    if (isHighDPI) {
+      deviceType += ' High DPI'
+    }
+
+    reportEvent({
+      sessionId: sessionID.current,
+      name: 'SessionStart',
+      values: {
+        userAgent: navigator.userAgent,
+        deviceType
+      }
+    }).catch((e) => {
+      console.error('Could not register session:', e)
+    })
+
+    const deregisterErrorHandlers = registerErrorHandlers()
+
+    return () => {
+      deregisterErrorHandlers()
+
+      reportEvent({
+        sessionId: sessionID.current,
+        name: 'SessionStop'
+      }).catch((e) => {
+        console.error('Could not deregister session:', e)
+      })
+    }
+  }, [])
 
   const handleFileClick = (fileName: string): void => {
     setSelectedFile((prevSelectedFile) => {
@@ -139,8 +179,8 @@ const App = (): React.ReactElement => {
 
     if (currentDirectory !== undefined && selectedFile !== undefined) {
       const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + selectedFile
-      deleteFile(path).catch((error) => {
-        console.error(error)
+      deleteFile(path).catch((e) => {
+        console.error(e)
       })
     }
   }, [currentDirectory, selectedFile])
@@ -155,8 +195,8 @@ const App = (): React.ReactElement => {
         if (response !== undefined) {
           setSelectedFileInfo(response)
         }
-      }).catch((error) => {
-        console.error(error)
+      }).catch((e) => {
+        console.error(e)
       })
     }
   }, [currentDirectory, selectedFile])
@@ -169,16 +209,16 @@ const App = (): React.ReactElement => {
   const handleCreateDirectory = useCallback((directoryName: string): void => {
     if (currentDirectory !== undefined) {
       const path = (currentDirectory !== '' ? currentDirectory + '/' : '') + directoryName
-      makeDirectory(path).then(() => {}).catch((error) => {
-        console.error(error)
+      makeDirectory(path).then(() => {}).catch((e) => {
+        console.error(e)
       })
     }
   }, [currentDirectory])
 
   const handleFileUpload = useCallback((): void => {
     if (currentDirectory !== undefined) {
-      uploadFile(currentDirectory).catch((error) => {
-        console.error(error)
+      uploadFile(currentDirectory).catch((e) => {
+        console.error(e)
       })
     }
   }, [currentDirectory])

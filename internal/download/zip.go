@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package util
+package download
 
 import (
 	"archive/tar"
@@ -26,8 +26,7 @@ import (
 	"path/filepath"
 )
 
-// TarToZip converts a tar archive to a zip archive.
-func TarToZip(w io.Writer, r io.Reader, prefix string) error {
+func tarToZip(w io.Writer, r io.Reader, prefix string) error {
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 

@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/writablefs"
 )
 
@@ -38,7 +37,7 @@ type Server struct {
 
 func NewServer(logger *slog.Logger, fsys writablefs.FS) (string, http.Handler) {
 	s := &Server{
-		logger: logger,
+		logger: logger.WithGroup("download"),
 		fsys:   fsys,
 	}
 
@@ -109,7 +108,7 @@ func (s *Server) handleDownloadDirectory(w http.ResponseWriter, r *http.Request,
 	defer tr.Close()
 
 	dirName := filepath.Base(path)
-	if err := util.TarToZip(w, tr, dirName); err != nil {
+	if err := tarToZip(w, tr, dirName); err != nil {
 		http.Error(w, "Error creating zip", http.StatusInternalServerError)
 	}
 }

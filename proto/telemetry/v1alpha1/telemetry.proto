@@ -1,0 +1,71 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Copyright 2024 Damian Peckett <damian@pecke.tt>.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+syntax = "proto3";
+
+package bucketeer.telemetry.v1alpha1;
+
+option go_package = "github.com/bucket-sailor/bucketeer/internal/gen/telemetry/v1alpha1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Telemetry is a service for capturing crash reports and anonymous statistics.
+service Telemetry {
+  rpc Report(TelemetryEvent) returns (google.protobuf.Empty);
+}
+
+message StackFrame {
+  // The file name where the error occurred.
+  string file = 1;
+  // The name of the method where the error occurred.
+  string function = 2;
+  // The line number in the file where the error occurred.
+  int32 line = 3;
+  // The column number in the line where the error occurred.
+  int32 column = 4;
+}
+
+enum TelemetryEventKind {
+  // The event is an informational message.
+  INFO = 0;
+  // The event is a warning message.
+  WARNING = 1;
+  // The event is an error message.
+  ERROR = 2;
+}
+
+message TelemetryEvent {
+  // The session ID associated with the event. The session id is short-lived and not persisted.
+  // It is only used to link events together (as there might be a relationship between them).
+  string session_id = 1;
+  // Timestamp when the event occurred.
+  google.protobuf.Timestamp timestamp = 2;
+  // The kind of event.
+  TelemetryEventKind kind = 3;
+  // The name of the event.
+  string name = 4;
+  // A message associated with the event.
+  string message = 5;
+  // Any values associated with the event.
+  map<string, string> values = 6;
+  // If an error, the stack trace associated with the event.
+  repeated StackFrame stack_trace = 7;
+  // A set of tags associated with the event.
+  repeated string tags = 8;
+}

@@ -45,7 +45,7 @@ type ChunkServer struct {
 
 func NewChunkServer(logger *slog.Logger, fsys, cacheFS writablefs.FS) (string, http.Handler) {
 	s := &ChunkServer{
-		logger:  logger,
+		logger:  logger.WithGroup("upload"),
 		fsys:    fsys,
 		cacheFS: cacheFS,
 	}

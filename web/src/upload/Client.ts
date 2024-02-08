@@ -97,8 +97,8 @@ class Client {
           if (this.opts.onProgress !== undefined) {
             this.opts.onProgress(uploadedBytes, fileSize)
           }
-        } catch (error) {
-          errors.push(error as Error)
+        } catch (e) {
+          errors.push(e as Error)
         }
       })
     }
@@ -178,11 +178,11 @@ class Client {
       try {
         const response = await fetch(url, { ...fetchOptions, signal: controller.signal })
         return await this.handleResponse(response)
-      } catch (error) {
-        if (isNetworkError(error)) {
+      } catch (e) {
+        if (isNetworkError(e)) {
           throw new Error('Network error: Unable to connect to the server')
         } else {
-          throw error
+          throw e
         }
       } finally {
         if (id !== undefined) {

@@ -16,32 +16,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import App from './App'
+package telemetry
 
-import './index.css'
+import (
+	"context"
+	"fmt"
+	"runtime"
 
-import '@fontsource/roboto/300.css'
-import '@fontsource/roboto/400.css'
-import '@fontsource/roboto/500.css'
-import '@fontsource/roboto/700.css'
-
-const baseURL = import.meta.env.PROD ? window.location.origin : 'http://localhost:16321'
-
-// defined in vite.config.ts
-const basePath = '/browse/'
-
-ReactDOM.createRoot(document.getElementById('root') as Element).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/*" element={<App
-          baseURL={baseURL}
-          basePath={basePath}
-          />} />
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
+	"github.com/docker/go-units"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
+
+func sysInfo(ctx context.Context) map[string]string {
+	info := map[string]string{
+		"os":   runtime.GOOS,
+		"arch": runtime.GOARCH,
+		"cpu":  fmt.Sprintf("%d", runtime.NumCPU()),
+	}
+
+	if vmStat, err := mem.VirtualMemory(); err == nil {
+		info["memory"] = units.HumanSize(float64(vmStat.Total))
+	}
+
+	if cpuInfo, err := cpu.Info(); err == nil {
+		if len(cpuInfo) > 0 {
+			info["cpuModel"] = cpuInfo[0].ModelName
+		}
+	}
+
+	return info
+}

@@ -18,7 +18,7 @@
 
 import { beforeEach, describe, expect, it, type jest } from '@jest/globals'
 import fetchMock from 'jest-fetch-mock'
-import Client from './client'
+import Client from './Client'
 import { TextDecoder, TextEncoder } from 'util'
 import { Empty, StringValue } from '@bufbuild/protobuf'
 import { CompleteResponse, CompletionStatus } from '../gen/upload/v1alpha1/upload_pb'

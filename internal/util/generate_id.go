@@ -16,32 +16,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import App from './App'
+package util
 
-import './index.css'
-
-import '@fontsource/roboto/300.css'
-import '@fontsource/roboto/400.css'
-import '@fontsource/roboto/500.css'
-import '@fontsource/roboto/700.css'
-
-const baseURL = import.meta.env.PROD ? window.location.origin : 'http://localhost:16321'
-
-// defined in vite.config.ts
-const basePath = '/browse/'
-
-ReactDOM.createRoot(document.getElementById('root') as Element).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/*" element={<App
-          baseURL={baseURL}
-          basePath={basePath}
-          />} />
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
+import (
+	"crypto/rand"
+	"math/big"
 )
+
+func GenerateID(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	id := make([]byte, n)
+	for i := range id {
+		r, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			panic(err)
+		}
+
+		id[i] = letters[r.Int64()]
+	}
+
+	return string(id)
+}

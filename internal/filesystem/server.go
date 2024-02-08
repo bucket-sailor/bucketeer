@@ -20,17 +20,16 @@ package filesystem
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"net/http"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/bucket-sailor/bucketeer/internal/gen/filesystem/v1alpha1"
 	"github.com/bucket-sailor/bucketeer/internal/gen/filesystem/v1alpha1/v1alpha1connect"
+	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/writablefs"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -53,7 +52,7 @@ type Server struct {
 
 func NewServer(logger *slog.Logger, fsys writablefs.FS) (string, http.Handler) {
 	s := &Server{
-		logger:       logger,
+		logger:       logger.WithGroup("fs"),
 		fsys:         fsys,
 		readDirCache: expirable.NewLRU[string, []*v1alpha1.ReadDirResponse_FileInfoWithIndex](readDirCacheMaxSize, nil, readDirCacheTTL),
 	}
@@ -100,7 +99,7 @@ func (s *Server) ReadDir(ctx context.Context, req *connect.Request[v1alpha1.Read
 
 	id := req.Msg.Id
 	if id == "" {
-		id = generateID(8)
+		id = util.GenerateID(16)
 
 		files, err = populateCache(id)
 		if err != nil {
@@ -212,20 +211,4 @@ func toFileInfo(entry writablefs.DirEntry) (*v1alpha1.FileInfo, error) {
 	}
 
 	return resp, nil
-}
-
-func generateID(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-	b := make([]byte, n)
-	for i := range b {
-		r, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			panic(err)
-		}
-
-		b[i] = letters[r.Int64()]
-	}
-
-	return string(b)
 }

@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -30,7 +31,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1"
 	"github.com/bucket-sailor/bucketeer/internal/gen/upload/v1alpha1/v1alpha1connect"
-	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/queue"
 	"github.com/bucket-sailor/writablefs"
 	"github.com/google/uuid"
@@ -59,7 +59,7 @@ type Server struct {
 
 func NewServer(logger *slog.Logger, fsys, cacheFS writablefs.FS) (string, http.Handler) {
 	s := &Server{
-		logger:          logger,
+		logger:          logger.WithGroup("upload"),
 		fsys:            fsys,
 		cacheFS:         cacheFS,
 		completionQueue: queue.NewQueue(runtime.NumCPU()),
@@ -184,7 +184,7 @@ func (s *Server) Complete(ctx context.Context, req *connect.Request[wrapperspb.S
 				return err
 			}
 
-			if err := util.CopyFile(s.cacheFS, cachePath, s.fsys, string(dstPath)); err != nil {
+			if err := copyFile(s.cacheFS, cachePath, s.fsys, string(dstPath)); err != nil {
 				return err
 			}
 
@@ -293,4 +293,21 @@ func (s *Server) PollForCompletion(ctx context.Context, req *connect.Request[wra
 			Status: *v1alpha1.CompletionStatus_COMPLETED.Enum(),
 		},
 	}, nil
+}
+
+func copyFile(srcFS writablefs.FS, srcPath string, dstFS writablefs.FS, dstPath string) error {
+	src, err := srcFS.OpenFile(srcPath, writablefs.FlagReadOnly)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := dstFS.OpenFile(dstPath, writablefs.FlagWriteOnly|writablefs.FlagCreate)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
 }

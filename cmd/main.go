@@ -21,38 +21,86 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
-	"time"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 
+	"github.com/adrg/xdg"
+	"github.com/bucket-sailor/bucketeer/internal/constants"
 	"github.com/bucket-sailor/bucketeer/internal/download"
 	"github.com/bucket-sailor/bucketeer/internal/filesystem"
+	"github.com/bucket-sailor/bucketeer/internal/telemetry"
 	"github.com/bucket-sailor/bucketeer/internal/upload"
-	"github.com/bucket-sailor/bucketeer/internal/util"
 	"github.com/bucket-sailor/bucketeer/web"
 	"github.com/bucket-sailor/writablefs/dirfs"
 	"github.com/bucket-sailor/writablefs/s3fs"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/pkg/browser"
 	slogecho "github.com/samber/slog-echo"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/net/http2"
 )
 
+const (
+	banner = `    ____             __        __                
+   / __ )__  _______/ /_____  / /____  ___  _____
+  / __  / / / / ___/ //_/ _ \/ __/ _ \/ _ \/ ___/
+ / /_/ / /_/ / /__/ ,< /  __/ /_/  __/  __/ /    
+/_____/\__,_/\___/_/|_|\___/\__/\___/\___/_/     
+The Ultimate S3 Bucket Explorer.`
+)
+
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	var logWriter io.WriteCloser = os.Stderr
+	logger := slog.New(slog.NewTextHandler(logWriter, nil))
 
 	beforeAll := func(c *cli.Context) error {
-		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		if !c.Bool("non-interactive") {
+			logPath := c.String("log-file")
+
+			err := os.MkdirAll(filepath.Dir(logPath), 0o755)
+			if err != nil {
+				return fmt.Errorf("failed to create log directory: %w", err)
+			}
+
+			logWriter, err = os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				return fmt.Errorf("failed to open log file: %w", err)
+			}
+		}
+
+		logger = slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{
 			Level: (*slog.Level)(c.Generic("log-level").(*logLevelFlag)),
 		}))
 
 		return nil
+	}
+
+	afterAll := func(c *cli.Context) error {
+		if logWriter != os.Stderr {
+			if err := logWriter.(io.Closer).Close(); err != nil {
+				return fmt.Errorf("failed to close log file: %w", err)
+			}
+
+			// For any shutdown logs.
+			logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+		}
+
+		return nil
+	}
+
+	logPath, err := xdg.DataFile("bucketeer/bucketeer.log")
+	if err != nil {
+		logger.Error("Failed to get xdg log path", "error", err)
+
+		os.Exit(1)
 	}
 
 	sharedFlags := []cli.Flag{
@@ -60,6 +108,11 @@ func main() {
 			Name:  "log-level",
 			Usage: "Set the log level",
 			Value: fromLogLevel(slog.LevelInfo),
+		},
+		&cli.StringFlag{
+			Name:  "log-file",
+			Usage: "The path to the log file",
+			Value: logPath,
 		},
 		&cli.BoolFlag{
 			Name:  "non-interactive",
@@ -71,13 +124,14 @@ func main() {
 		Name:      "bucketeer",
 		Usage:     "The ultimate S3 bucket explorer",
 		ArgsUsage: "<bucket name>",
+		Version:   constants.Version,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "listen",
 				Usage:   "The address to listen on",
 				Aliases: []string{"l"},
 				EnvVars: []string{"LISTEN_ADDR"},
-				Value:   ":0",
+				Value:   "localhost:16321",
 			},
 			&cli.BoolFlag{
 				Name:  "disable-cors",
@@ -116,6 +170,7 @@ func main() {
 			},
 		}, sharedFlags...),
 		Before: beforeAll,
+		After:  afterAll,
 		Action: func(c *cli.Context) error {
 			if c.NArg() < 1 {
 				_ = cli.ShowAppHelp(c)
@@ -175,14 +230,25 @@ func main() {
 
 			fsys, err := s3fs.New(c.Context, logger, opts)
 			if err != nil {
-				return fmt.Errorf("failed to create s3 filesystem: %w", err)
+				return fmt.Errorf("failed to open s3 filesystem: %w", err)
 			}
+
+			telemetryReporter := telemetry.NewRemoteReporter(
+				c.Context, logger, http.DefaultClient, constants.TelemetryURL)
+			defer telemetryReporter.Close()
 
 			e := echo.New()
 			e.HideBanner = true
 
 			e.Use(slogecho.New(logger))
-			e.Use(middleware.Recover())
+
+			recoverConfig := middleware.DefaultRecoverConfig
+			recoverConfig.StackSize = 8000000 // Capture as much as practical
+
+			panicReporter := telemetry.NewPanicReporter(logger, telemetryReporter)
+			recoverConfig.LogErrorFunc = panicReporter.OnPanic
+
+			e.Use(middleware.RecoverWithConfig(recoverConfig))
 
 			// Allow disabling CORS protection for development.
 			if c.Bool("disable-cors") {
@@ -218,7 +284,7 @@ func main() {
 			filesystemServerPath, filesystemServer := filesystem.NewServer(logger, fsys)
 			e.Any(filesystemServerPath+"*", echo.WrapHandler(filesystemServer))
 
-			// Handle bulk file transfers.
+			// Handle file uploads / downloads.
 			cacheDir, err := os.MkdirTemp("", "bucketeer-*")
 			if err != nil {
 				return err
@@ -232,7 +298,6 @@ func main() {
 				return err
 			}
 
-			// Handle file uploads.
 			uploadServerPath, uploadServer := upload.NewServer(logger, fsys, cacheFS)
 			e.Any(uploadServerPath+"*", echo.WrapHandler(uploadServer))
 
@@ -242,35 +307,33 @@ func main() {
 			downloadServerPath, downloadServer := download.NewServer(logger, fsys)
 			e.Any(downloadServerPath+"*", echo.WrapHandler(downloadServer))
 
+			// Allow the browser to report telemetry / errors.
+			telemetryProxyServerPath, telemetryProxyServer := telemetry.NewProxyServer(logger, telemetryReporter)
+			e.Any(telemetryProxyServerPath+"*", echo.WrapHandler(telemetryProxyServer))
+
+			// Catch any shutdown signals.
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+			go func() {
+				<-sigCh
+
+				logger.Info("Shutting down server")
+
+				if err := e.Shutdown(c.Context); err != nil {
+					logger.Error("Failed to shutdown server", "error", err)
+				}
+			}()
+
 			if !c.Bool("non-interactive") {
-				go func() {
-					if err := util.WaitForServerReady(e, 10*time.Second); err != nil {
-						logger.Error("Failed to start server", "error", err)
-
-						// shutdown the server
-						_ = e.Shutdown(c.Context)
-						return
-					}
-
-					// parse the host and port from the listener
-					_, port, err := net.SplitHostPort(e.Listener.Addr().String())
-					if err != nil {
-						logger.Warn("Failed to parse listener address", "error", err)
-
-						return
-					}
-
-					browseURL := "http://localhost:" + port + "/browse/"
-
-					logger.Info("Opening in the users default browser", "url", browseURL)
-
-					if err := browser.OpenURL(browseURL); err != nil {
-						logger.Warn("Failed to open browser", "error", err)
-					}
-				}()
+				fmt.Println(banner)
 			}
 
-			return e.StartH2CServer(c.String("listen"), &http2.Server{})
+			if err := e.StartH2CServer(c.String("listen"), &http2.Server{}); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return fmt.Errorf("failed to start server: %w", err)
+			}
+
+			return nil
 		},
 	}
 
