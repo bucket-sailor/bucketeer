@@ -42,6 +42,7 @@ import (
 	"github.com/bucket-sailor/writablefs/s3fs"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/mattn/go-isatty"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	slogecho "github.com/samber/slog-echo"
 	"github.com/urfave/cli/v2"
@@ -61,8 +62,11 @@ func main() {
 	var logWriter io.WriteCloser = os.Stderr
 	logger := slog.New(slog.NewTextHandler(logWriter, nil))
 
+	nonInteractive := !isatty.IsTerminal(os.Stdout.Fd()) &&
+		!isatty.IsCygwinTerminal(os.Stdout.Fd())
+
 	beforeAll := func(c *cli.Context) error {
-		if !c.Bool("non-interactive") {
+		if !nonInteractive {
 			logPath := c.String("log-file")
 
 			err := os.MkdirAll(filepath.Dir(logPath), 0o755)
@@ -107,19 +111,14 @@ func main() {
 		&cli.GenericFlag{
 			Name:    "log-level",
 			Usage:   "Set the log level",
-			EnvVars: []string{"LOG_LEVEL"},
+			EnvVars: []string{"BUCKETEER_LOG_LEVEL"},
 			Value:   fromLogLevel(slog.LevelInfo),
 		},
 		&cli.StringFlag{
 			Name:    "log-file",
 			Usage:   "The path to the log file",
-			EnvVars: []string{"LOG_FILE"},
+			EnvVars: []string{"BUCKETEER_LOG_FILE"},
 			Value:   logPath,
-		},
-		&cli.BoolFlag{
-			Name:    "non-interactive",
-			Usage:   "Run in non-interactive mode",
-			EnvVars: []string{"NON_INTERACTIVE"},
 		},
 	}
 
@@ -133,13 +132,13 @@ func main() {
 				Name:    "listen",
 				Usage:   "The address to listen on",
 				Aliases: []string{"l"},
-				EnvVars: []string{"LISTEN_ADDR"},
+				EnvVars: []string{"BUCKETEER_LISTEN_ADDR"},
 				Value:   "localhost:16321",
 			},
 			&cli.BoolFlag{
 				Name:    "disable-cors",
 				Usage:   "Disable CORS protection",
-				EnvVars: []string{"DISABLE_CORS"},
+				EnvVars: []string{"BUCKETEER_DISABLE_CORS"},
 			},
 			&cli.StringFlag{
 				Name:    "endpoint-url",
@@ -334,7 +333,7 @@ func main() {
 				}
 			}()
 
-			if !c.Bool("non-interactive") {
+			if !nonInteractive {
 				fmt.Println(banner)
 			}
 

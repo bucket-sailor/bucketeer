@@ -17,6 +17,7 @@ require (
 	github.com/jinzhu/copier v0.4.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/maruel/panicparse/v2 v2.3.1
+	github.com/mattn/go-isatty v0.0.20
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/neilotoole/slogt v1.1.0
 	github.com/rogpeppe/go-internal v1.12.0
@@ -42,7 +43,6 @@ require (
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20231016141302-07b5767bb0ed // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
