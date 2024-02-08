@@ -39,6 +39,7 @@ const (
 
 type Reporter interface {
 	io.Closer
+	ReportStart(ctx context.Context, endpointURL string) error
 	ReportEvent(event *v1alpha1.TelemetryEvent)
 }
 
@@ -58,28 +59,36 @@ func NewRemoteReporter(ctx context.Context, logger *slog.Logger, httpClient conn
 		logger.Info("Telemetry reporting is disabled")
 	}
 
-	r := &RemoteReporter{
+	return &RemoteReporter{
 		ctx:       ctx,
 		logger:    logger,
 		enabled:   enabled,
 		client:    v1alpha1connect.NewTelemetryClient(httpClient, baseURL),
 		processID: util.GenerateID(16),
 	}
-
-	values := sysInfo(ctx)
-	values["appVersion"] = constants.Version
-
-	r.ReportEvent(&v1alpha1.TelemetryEvent{
-		Name:   "ApplicationStart",
-		Values: values,
-	})
-
-	return r
 }
 
 func (r *RemoteReporter) Close() error {
 	r.ReportEvent(&v1alpha1.TelemetryEvent{
 		Name: "ApplicationStop",
+	})
+
+	return nil
+}
+
+func (r *RemoteReporter) ReportStart(ctx context.Context, endpointURL string) error {
+	provider, err := StripS3EndpointURL(endpointURL)
+	if err != nil {
+		return err
+	}
+
+	values := sysInfo(ctx)
+	values["appVersion"] = constants.Version
+	values["provider"] = provider
+
+	r.ReportEvent(&v1alpha1.TelemetryEvent{
+		Name:   "ApplicationStart",
+		Values: values,
 	})
 
 	return nil

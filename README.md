@@ -20,7 +20,7 @@ bucketeer my-bucket
 
 ## Telemetry
 
-By default Bucketeer gathers anonymous crash and usage data to help improve the project. This anonymized data is processed on our servers within the EU and is not shared with third parties. You can opt out of telemetry by setting the `BUCKETEER_NO_TELEMETRY=1` environment variable.
+By default Bucketeer gathers anonymous crash and usage data. This anonymized data is processed on our servers within the EU and is not shared with third parties. You can opt out of telemetry by setting the `BUCKETEER_NO_TELEMETRY=1` environment variable.
 
 ## License
 

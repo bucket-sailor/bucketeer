@@ -19,6 +19,7 @@
 package telemetry_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -86,6 +87,11 @@ func TestPanicReporter(t *testing.T) {
 
 type mockTelemetryReporter struct {
 	mock.Mock
+}
+
+func (r *mockTelemetryReporter) ReportStart(ctx context.Context, endpointURL string) error {
+	r.Called(ctx, endpointURL)
+	return nil
 }
 
 func (r *mockTelemetryReporter) ReportEvent(event *v1alpha1.TelemetryEvent) {

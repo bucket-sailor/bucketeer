@@ -105,18 +105,21 @@ func main() {
 
 	sharedFlags := []cli.Flag{
 		&cli.GenericFlag{
-			Name:  "log-level",
-			Usage: "Set the log level",
-			Value: fromLogLevel(slog.LevelInfo),
+			Name:    "log-level",
+			Usage:   "Set the log level",
+			EnvVars: []string{"LOG_LEVEL"},
+			Value:   fromLogLevel(slog.LevelInfo),
 		},
 		&cli.StringFlag{
-			Name:  "log-file",
-			Usage: "The path to the log file",
-			Value: logPath,
+			Name:    "log-file",
+			Usage:   "The path to the log file",
+			EnvVars: []string{"LOG_FILE"},
+			Value:   logPath,
 		},
 		&cli.BoolFlag{
-			Name:  "non-interactive",
-			Usage: "Whether to run in non-interactive mode",
+			Name:    "non-interactive",
+			Usage:   "Run in non-interactive mode",
+			EnvVars: []string{"NON_INTERACTIVE"},
 		},
 	}
 
@@ -134,8 +137,9 @@ func main() {
 				Value:   "localhost:16321",
 			},
 			&cli.BoolFlag{
-				Name:  "disable-cors",
-				Usage: "Disable CORS protection (for local development)",
+				Name:    "disable-cors",
+				Usage:   "Disable CORS protection",
+				EnvVars: []string{"DISABLE_CORS"},
 			},
 			&cli.StringFlag{
 				Name:    "endpoint-url",
@@ -237,6 +241,11 @@ func main() {
 				c.Context, logger, http.DefaultClient, constants.TelemetryURL)
 			defer telemetryReporter.Close()
 
+			err = telemetryReporter.ReportStart(c.Context, c.String("endpoint-url"))
+			if err != nil {
+				logger.Warn("Failed to report application start", "error", err)
+			}
+
 			e := echo.New()
 			e.HideBanner = true
 
@@ -250,7 +259,7 @@ func main() {
 
 			e.Use(middleware.RecoverWithConfig(recoverConfig))
 
-			// Allow disabling CORS protection for development.
+			// For local development.
 			if c.Bool("disable-cors") {
 				e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 					AllowOrigins: []string{"http://localhost:*"},
