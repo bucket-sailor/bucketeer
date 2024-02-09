@@ -11,6 +11,12 @@ Assuming you have the [AWS CLI](https://aws.amazon.com/cli/) installed and confi
 bucketeer my-bucket
 ```
 
+If you aren't using AWS you will need to specify the S3 endpoint to use (funnily enough AWS doesn't provide a standard configuration option for this):
+
+```shell
+bucketeer --endpoint-url=https://my-account.r2.cloudflarestorage.com my-bucket
+```
+
 ## Features
 
 * Easy to use Web UI.
