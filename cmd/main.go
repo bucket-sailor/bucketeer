@@ -62,19 +62,16 @@ func main() {
 	var logWriter io.WriteCloser = os.Stderr
 	logger := slog.New(slog.NewTextHandler(logWriter, nil))
 
-	nonInteractive := !isatty.IsTerminal(os.Stdout.Fd()) &&
-		!isatty.IsCygwinTerminal(os.Stdout.Fd())
-
 	beforeAll := func(c *cli.Context) error {
-		if !nonInteractive {
-			logPath := c.String("log-file")
+		logFilePath := c.String("log-file")
 
-			err := os.MkdirAll(filepath.Dir(logPath), 0o755)
+		if logFilePath != "" {
+			err := os.MkdirAll(filepath.Dir(logFilePath), 0o755)
 			if err != nil {
 				return fmt.Errorf("failed to create log directory: %w", err)
 			}
 
-			logWriter, err = os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+			logWriter, err = os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 			if err != nil {
 				return fmt.Errorf("failed to open log file: %w", err)
 			}
@@ -88,7 +85,9 @@ func main() {
 	}
 
 	afterAll := func(c *cli.Context) error {
-		if logWriter != os.Stderr {
+		logFilePath := c.String("log-file")
+
+		if logFilePath != "" {
 			if err := logWriter.(io.Closer).Close(); err != nil {
 				return fmt.Errorf("failed to close log file: %w", err)
 			}
@@ -100,11 +99,18 @@ func main() {
 		return nil
 	}
 
-	logPath, err := xdg.DataFile("bucketeer/bucketeer.log")
-	if err != nil {
-		logger.Error("Failed to get xdg log path", "error", err)
+	// Attempt to detect if we're running in a headless environment.
+	headless := !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd())
 
-		os.Exit(1)
+	var defaultLogFilePath string
+	if !headless {
+		var err error
+		defaultLogFilePath, err = xdg.DataFile("bucketeer/bucketeer.log")
+		if err != nil {
+			logger.Error("Failed to get defaut log path", "error", err)
+
+			os.Exit(1)
+		}
 	}
 
 	sharedFlags := []cli.Flag{
@@ -116,9 +122,15 @@ func main() {
 		},
 		&cli.StringFlag{
 			Name:    "log-file",
-			Usage:   "The path to the log file",
+			Usage:   "The path to the log file, if not set logs will be written to stderr",
 			EnvVars: []string{"BUCKETEER_LOG_FILE"},
-			Value:   logPath,
+			Value:   defaultLogFilePath,
+		},
+		&cli.BoolFlag{
+			Name:    "headless",
+			Usage:   "Run in headless mode",
+			EnvVars: []string{"BUCKETEER_HEADLESS"},
+			Value:   headless,
 		},
 	}
 
@@ -285,6 +297,7 @@ func main() {
 				webFSServer.ServeHTTP(c.Response(), c.Request())
 				return nil
 			})
+
 			// Assets etc.
 			e.GET("/*", echo.WrapHandler(webFSServer))
 
@@ -333,7 +346,7 @@ func main() {
 				}
 			}()
 
-			if !nonInteractive {
+			if !headless {
 				fmt.Println(banner)
 			}
 

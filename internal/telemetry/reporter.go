@@ -125,7 +125,7 @@ func (r *RemoteReporter) ReportEvent(event *v1alpha1.TelemetryEvent) {
 		_, err := r.client.Report(r.ctx, req)
 		if err != nil {
 			// Don't log errors when the user is offline.
-			r.logger.Debug("Failed to report event", "err", err)
+			r.logger.Debug("Failed to report event", "error", err)
 		}
 	}
 }

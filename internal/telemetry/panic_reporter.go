@@ -46,7 +46,7 @@ func (r *PanicReporter) OnPanic(c echo.Context, reportedError error, reportedSta
 
 	snapshot, _, err := stack.ScanSnapshot(strings.NewReader(string(reportedStack)+"\n\n"), io.Discard, stack.DefaultOpts())
 	if err != nil {
-		r.logger.Error("Stack is probably corrupted", "err", err)
+		r.logger.Error("Stack is probably corrupted", "error", err)
 
 		return echo.NewHTTPError(500, "Internal server error")
 	}
